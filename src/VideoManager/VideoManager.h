@@ -152,6 +152,7 @@ protected:
     void _restartVideo              (unsigned id);
     void _startReceiver             (unsigned id);
     void _stopReceiver              (unsigned id);
+    void _loadCustomVideoConfigs    ();
 
 protected:
     QString                 _videoFile;
@@ -161,6 +162,7 @@ protected:
     VideoReceiver*          _videoReceiver[2]       = { nullptr, nullptr };
     void*                   _videoSink[2]           = { nullptr, nullptr };
     QString                 _videoUri[2];
+    QMap<int, QString>      _customVideoConfigs;
     // FIXME: AV: _videoStarted seems to be access from 3 different threads, from time to time
     // 1) Video Receiver thread
     // 2) Video Manager/main app thread

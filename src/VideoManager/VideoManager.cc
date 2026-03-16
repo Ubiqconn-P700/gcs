@@ -13,6 +13,10 @@
 #include <QSettings>
 #include <QUrl>
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QQuickWindow>
 
 #ifndef QGC_DISABLE_UVC
@@ -104,6 +108,8 @@ VideoManager::setToolbox(QGCToolbox *toolbox)
    connect(_videoSettings->lowLatencyMode(),&Fact::rawValueChanged, this, &VideoManager::_lowLatencyModeChanged);
    MultiVehicleManager *pVehicleMgr = qgcApp()->toolbox()->multiVehicleManager();
    connect(pVehicleMgr, &MultiVehicleManager::activeVehicleChanged, this, &VideoManager::_setActiveVehicle);
+
+   _loadCustomVideoConfigs();
 
 #if defined(QGC_GST_STREAMING)
     GStreamer::blacklist(static_cast<VideoSettings::VideoDecoderOptions>(_videoSettings->forceVideoDecoder()->rawValue().toInt()));
@@ -665,6 +671,19 @@ VideoManager::_updateSettings(unsigned id)
 
     _lowLatencyStreaming[id] = lowLatencyStreaming;
 
+    //-- Custom configuration from JSON
+    if (_activeVehicle) {
+        int vID = _activeVehicle->id();
+        if (_customVideoConfigs.contains(vID)) {
+            QString customUri = _customVideoConfigs[vID];
+            qCDebug(VideoManagerLog) << "Using custom video URI for vehicle" << vID << ":" << customUri;
+            if (_updateVideoUri(id, customUri)) {
+                _videoSettings->videoSource()->setRawValue(VideoSettings::videoSourceRTSP);
+                return true;
+            }
+        }
+    }
+
     //-- Auto discovery
 
     if(_activeVehicle && _activeVehicle->cameraManager()) {
@@ -917,4 +936,50 @@ void
 VideoManager::_aspectRatioChanged()
 {
     emit aspectRatioChanged();
+}
+void VideoManager::_loadCustomVideoConfigs()
+{
+    QString savePath = _toolbox->settingsManager()->appSettings()->savePath()->rawValue().toString();
+    QDir rootDir(savePath);
+
+    if (!rootDir.exists("Configs")) {
+        rootDir.mkdir("Configs");
+        qCDebug(VideoManagerLog) << "Created Configs directory at" << rootDir.filePath("Configs");
+    }
+
+    QString filePath = rootDir.filePath("Configs/video_config.json");
+    QFile file(filePath);
+
+    if (!file.exists()) {
+        qCDebug(VideoManagerLog) << "Custom video config file does not exist:" << filePath;
+        return;
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCDebug(VideoManagerLog) << "Failed to open custom video config file:" << filePath;
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isArray()) {
+        qCDebug(VideoManagerLog) << "Custom video config JSON is not an array";
+        return;
+    }
+
+    QJsonArray array = doc.array();
+    _customVideoConfigs.clear();
+
+    for (int i = 0; i < array.size(); ++i) {
+        QJsonObject obj = array[i].toObject();
+        int vID = obj["vehicleId"].toInt();
+        QString url = obj["rtspUrl"].toString();
+
+        if (vID > 0 && !url.isEmpty()) {
+            _customVideoConfigs[vID] = url;
+            qCDebug(VideoManagerLog) << "Loaded custom video config: Vehicle" << vID << "URL" << url;
+        }
+    }
 }
