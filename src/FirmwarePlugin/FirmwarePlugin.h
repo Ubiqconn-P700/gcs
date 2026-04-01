@@ -12,7 +12,7 @@
 class VehicleComponent;
 class AutoPilotPlugin;
 class Vehicle;
-class MavlinkCameraControl;
+class MavlinkCameraControlInterface;
 class QGCCameraManager;
 class Autotune;
 class LinkInterface;
@@ -207,8 +207,9 @@ public:
     /// Command the vehicle to start the mission
     virtual void startMission(Vehicle *vehicle) const;
 
-    /// Command vehicle to move to specified location (altitude is included and relative)
-    virtual void guidedModeGotoLocation(Vehicle *vehicle, const QGeoCoordinate &gotoCoord, double forwardFlightLoiterRadius = 0.0) const;
+    /// Command vehicle to move to specified location (altitude is ignored, vehicle uses current altitude)
+    /// @return true: goto command accepted, false: goto failed (vehicle not moved)
+    virtual bool guidedModeGotoLocation(Vehicle *vehicle, const QGeoCoordinate &gotoCoord, double forwardFlightLoiterRadius = 0.0) const;
 
     /// Command vehicle to change altitude
     ///     @param altitudeChange If > 0, go up by amount specified, if < 0, go down by amount specified
@@ -342,7 +343,7 @@ public:
     virtual QGCCameraManager *createCameraManager(Vehicle *vehicle) const;
 
     /// Camera control.
-    virtual MavlinkCameraControl *createCameraControl(const mavlink_camera_information_t *info, Vehicle *vehicle, int compID, QObject *parent = nullptr) const;
+    virtual MavlinkCameraControlInterface *createCameraControl(const mavlink_camera_information_t *info, Vehicle *vehicle, int compID, QObject *parent = nullptr) const;
 
     /// Returns a pointer to a dictionary of firmware-specific FactGroups
     virtual QMap<QString, FactGroup*> *factGroups() { return nullptr; }
