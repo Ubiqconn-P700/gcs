@@ -11,7 +11,9 @@
 #include "PositionManager.h"
 #include "QGCMapEngineManager.h"
 #include "ADSBVehicleManager.h"
+#include "AudioOutput.h"
 #include "NTRIPManager.h"
+#include "MAVLinkSigningKeys.h"
 #include "MissionCommandTree.h"
 #include "VideoManager.h"
 #include "MultiVehicleManager.h"
@@ -39,6 +41,7 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     , _ntripManager(NTRIPManager::instance())
     , _qgcPositionManager(QGCPositionManager::instance())
     , _missionCommandTree(MissionCommandTree::instance())
+    , _mavlinkSigningKeys(MAVLinkSigningKeys::instance())
     , _videoManager(VideoManager::instance())
     , _linkManager(LinkManager::instance())
     , _multiVehicleManager(MultiVehicleManager::instance())
@@ -312,6 +315,11 @@ void QGroundControlQmlGlobal::showMessageDialog(
     emit showMessageDialogRequested(owner, title, text, buttons, acceptFunction, closeFunction);
 }
 
+void QGroundControlQmlGlobal::testAudioOutput()
+{
+    AudioOutput::instance()->testAudioOutput();
+}
+
 QString QGroundControlQmlGlobal::elevationProviderName()
 {
     return _settingsManager->flightMapSettings()->elevationMapProvider()->rawValue().toString();
@@ -335,16 +343,6 @@ QString QGroundControlQmlGlobal::telemetryFileExtension() const
 QString QGroundControlQmlGlobal::appName()
 {
     return QCoreApplication::applicationName();
-}
-
-void QGroundControlQmlGlobal::deleteAllSettingsNextBoot()
-{
-    QGCApplication::deleteAllSettingsNextBoot();
-}
-
-void QGroundControlQmlGlobal::clearDeleteAllSettingsNextBoot()
-{
-    QGCApplication::clearDeleteAllSettingsNextBoot();
 }
 
 QmlObjectListModel *QGroundControlQmlGlobal::treeLoggingCategoriesModel()

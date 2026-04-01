@@ -94,7 +94,7 @@ DECLARE_SETTINGGROUP(App, "")
         }
         savePathFact->setRawValue(QDir(rootDirPath).filePath(appName));
     #endif
-    savePathFact->setVisible(false);
+    savePathFact->setUserVisible(false);
 #else
         QDir rootDir;
         if (qgcApp()->runningUnitTests() || qgcApp()->simpleBootTest()) {
@@ -121,10 +121,11 @@ DECLARE_SETTINGSFACT(AppSettings, offlineEditingDescentSpeed)
 DECLARE_SETTINGSFACT(AppSettings, batteryPercentRemainingAnnounce)
 DECLARE_SETTINGSFACT(AppSettings, defaultMissionItemAltitude)
 DECLARE_SETTINGSFACT(AppSettings, audioMuted)
+DECLARE_SETTINGSFACT(AppSettings, audioVolume)
 DECLARE_SETTINGSFACT(AppSettings, virtualJoystick)
 DECLARE_SETTINGSFACT(AppSettings, virtualJoystickAutoCenterThrottle)
 DECLARE_SETTINGSFACT(AppSettings, virtualJoystickLeftHandedMode)
-DECLARE_SETTINGSFACT(AppSettings, appFontPointSize)
+DECLARE_SETTINGSFACT(AppSettings, uiScalePercent)
 DECLARE_SETTINGSFACT(AppSettings, savePath)
 DECLARE_SETTINGSFACT(AppSettings, androidDontSaveToSDCard)
 DECLARE_SETTINGSFACT(AppSettings, useChecklist)
@@ -140,8 +141,10 @@ DECLARE_SETTINGSFACT(AppSettings, vworldToken)
 DECLARE_SETTINGSFACT(AppSettings, openaipToken)
 DECLARE_SETTINGSFACT(AppSettings, gstDebugLevel)
 DECLARE_SETTINGSFACT(AppSettings, followTarget)
+DECLARE_SETTINGSFACT(AppSettings, clearSettingsNextBoot)
 DECLARE_SETTINGSFACT(AppSettings, disableAllPersistence)
 DECLARE_SETTINGSFACT(AppSettings, firstRunPromptIdsShown)
+DECLARE_SETTINGSFACT(AppSettings, favoriteParameters)
 
 DECLARE_SETTINGSFACT_NO_FUNC(AppSettings, indoorPalette)
 {

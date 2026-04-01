@@ -7,6 +7,7 @@
 #include "QGCCameraManager.h"
 #include "QGCFileDownload.h"
 #include "QGCLoggingCategory.h"
+#include "Vehicle.h"
 #include "VehicleCameraControl.h"
 #include "VehicleComponent.h"
 
@@ -204,6 +205,7 @@ const QVariantList &FirmwarePlugin::toolIndicators(const Vehicle*)
             QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Toolbar/GimbalIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Toolbar/EscIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Toolbar/JoystickIndicator.qml")),
+            QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Toolbar/SigningIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Toolbar/MultiVehicleSelector.qml")),
 #ifdef QT_DEBUG
             // ControlIndicator is only available in debug builds for the moment
