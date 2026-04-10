@@ -111,8 +111,10 @@ add_qgc_test(QGCSerialPortInfoTest LABELS Unit Comms)
 # FactSystem
 # ----------------------------------------------------------------------------
 add_subdirectory(FactSystem)
+add_qgc_test(APMParameterMetaDataTest LABELS Unit)
 add_qgc_test(FactGroupTest LABELS Unit)
 add_qgc_test(FactMetaDataTest LABELS Unit)
+add_qgc_test(PX4ParameterMetaDataTest LABELS Unit)
 add_qgc_test(FactSystemTestGeneric LABELS Integration Vehicle RESOURCE_LOCK MockLink)
 add_qgc_test(FactSystemTestPX4 LABELS Integration Vehicle RESOURCE_LOCK MockLink)
 add_qgc_test(FactTest LABELS Unit)
@@ -238,6 +240,17 @@ add_qgc_test(GeoTest LABELS Unit Utilities)
 add_qgc_test(GeoJsonHelperTest LABELS Unit Utilities)
 add_qgc_test(KMLDomDocumentTest LABELS Unit Utilities)
 add_qgc_test(QGCMathTest LABELS Unit Utilities)
+# Database
+add_qgc_test(QGCSqlHelperTest LABELS Unit Utilities)
+# Logging
+add_qgc_test(LogEntryTest LABELS Unit Utilities)
+add_qgc_test(LogFormatterTest LABELS Unit Utilities)
+add_qgc_test(LogManagerTest LABELS Unit Utilities)
+add_qgc_test(LogModelTest LABELS Unit Utilities)
+add_qgc_test(LoggingQmlBindingTest LABELS Unit Utilities)
+add_qgc_test(LogRemoteSinkTest LABELS Unit Utilities)
+add_qgc_test(LogStoreTest LABELS Unit Utilities)
+add_qgc_test(LogStoreQueryModelTest LABELS Unit Utilities)
 # StateMachine
 add_qgc_test(QGCStateMachineTest LABELS Unit Utilities)
 add_qgc_test(ErrorRecoveryBuilderTest LABELS Unit Utilities)
