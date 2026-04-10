@@ -106,6 +106,7 @@
 #include "CustomAction.h"
 #include "CustomActionManager.h"
 #include "GimbalController.h"
+#include "DeviceBatteryController.h"
 
 #if defined(QGC_ENABLE_PAIRING)
 #include "PairingManager.h"
@@ -370,6 +371,8 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
 
     // Disable check new version by Gino
     // _checkForNewVersion();
+
+    _deviceBattery = new DeviceBatteryController(this);
 }
 
 void QGCApplication::_exitWithError(QString errorMessage)
@@ -556,6 +559,7 @@ bool QGCApplication::_initForNormalAppBoot()
     QSettings settings;
 
     _qmlAppEngine = toolbox()->corePlugin()->createQmlApplicationEngine(this);
+    _qmlAppEngine->rootContext()->setContextProperty("DeviceBattery", _deviceBattery);
     toolbox()->corePlugin()->createRootWindow(_qmlAppEngine);
 
     // Image provider for PX4 Flow

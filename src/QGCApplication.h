@@ -40,6 +40,7 @@
 class QQmlApplicationEngine;
 class QGCSingleton;
 class QGCToolbox;
+class DeviceBatteryController;
 
 /**
  * @brief The main application and management class.
@@ -215,6 +216,7 @@ private:
     QLocale             _locale;
     bool                _error                  = false;
     QElapsedTimer       _msecsElapsedTime;
+    DeviceBatteryController* _deviceBattery     = nullptr;
 
     QList<QPair<QString /* title */, QString /* message */>> _delayedAppMessages;
 

@@ -4,6 +4,8 @@ add_subdirectory(toolbar)
 add_library(ui
 	QGCPluginHost.cc
 	QGCPluginHost.h
+	toolbar/DeviceBatteryController.cc
+	toolbar/DeviceBatteryController.h
 
 	# UI
 	QGCPluginHost.ui

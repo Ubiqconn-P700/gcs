@@ -98,7 +98,8 @@ Rectangle {
         anchors.bottomMargin:   1
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
-        anchors.right:          parent.right
+        anchors.right:          tabletBatteryDemo.left
+        anchors.rightMargin:    ScreenTools.defaultFontPixelWidth
         contentWidth:           indicatorLoader.x + indicatorLoader.width
         flickableDirection:     Flickable.HorizontalFlick
 
@@ -114,8 +115,45 @@ Rectangle {
     }
 
     //-------------------------------------------------------------------------
+    //-- Tablet Battery Demo
+    Item {
+        id:                     tabletBatteryDemo
+        anchors.right:          parent.right
+        anchors.rightMargin:    (brandImage.visible ? (brandImage.width + ScreenTools.defaultFontPixelWidth) : 0) + ScreenTools.defaultFontPixelHeight * 0.5
+        anchors.top:            parent.top
+        anchors.bottom:         parent.bottom
+        anchors.topMargin:      ScreenTools.defaultFontPixelHeight * 0.1
+        anchors.bottomMargin:   ScreenTools.defaultFontPixelHeight * 0.1
+        width:                  batteryCol.width
+        visible:                currentToolbar !== planViewToolbar
+        
+        Column {
+            id:                     batteryCol
+            anchors.centerIn:       parent
+            spacing:                0
+
+            QGCColoredImage {
+                anchors.horizontalCenter: parent.horizontalCenter
+                height:                 tabletBatteryDemo.height * 0.40
+                width:                  height * 1.8 // 如果是橫向電池，寬度會大於高度
+                source:                 DeviceBattery ? (DeviceBattery.isCharging ? "/qmlimages/PadBatteryCharging.svg" : "/qmlimages/PadBattery.svg") : "/qmlimages/PadBattery.svg"
+                fillMode:               Image.PreserveAspectFit
+                color:                  qgcPal.text
+            }
+
+            QGCLabel {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text:                   DeviceBattery ? (DeviceBattery.percentage + "%") : "..."
+                color:                  DeviceBattery ? (DeviceBattery.percentage < 20 ? qgcPal.colorRed : qgcPal.colorGreen) : qgcPal.text
+                font.pointSize:         ScreenTools.defaultFontPointSize
+            }
+        }
+    }
+
+    //-------------------------------------------------------------------------
     //-- Branding Logo
     Image {
+        id:                     brandImage
         anchors.right:          parent.right
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
