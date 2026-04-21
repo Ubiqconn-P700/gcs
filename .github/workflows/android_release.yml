@@ -25,6 +25,7 @@ env:
   SOURCE_DIR: ${{ github.workspace }}
   QT_VERSION: 5.15.2
   BUILD_TYPE: ${{ fromJSON('["DailyBuild", "StableBuild"]')[ github.ref_type == 'tag' || contains(github.ref, 'RuggonV1' ) ] }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -50,7 +51,7 @@ jobs:
         continue-on-error: true
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
           host: linux
@@ -91,7 +92,7 @@ jobs:
         run: echo "name=timestamp::$(date --utc +'%Y-%m-%d-%H\;%M\;%S')" >> $GITHUB_OUTPUT
 
       - name: ccache cache files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.ccache
           key: ${{ runner.os }}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
@@ -141,7 +142,7 @@ jobs:
           echo "APK_FILENAME=$APK_FILENAME" >> $GITHUB_ENV
 
       - name: Save artifact
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APK_FILENAME }}
           path: ${{ env.APK_PATH }}
