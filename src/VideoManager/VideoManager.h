@@ -58,6 +58,7 @@ public:
     Q_PROPERTY(bool             decoding                READ    decoding                                    NOTIFY decodingChanged)
     Q_PROPERTY(bool             recording               READ    recording                                   NOTIFY recordingChanged)
     Q_PROPERTY(QSize            videoSize               READ    videoSize                                   NOTIFY videoSizeChanged)
+    Q_PROPERTY(int              activeVideoIndex        READ    activeVideoIndex                            NOTIFY activeVideoIndexChanged)
 
     virtual bool        hasVideo            ();
     virtual bool        isGStreamer         ();
@@ -89,6 +90,8 @@ public:
         const quint32 size = _videoSize;
         return QSize((size >> 16) & 0xFFFF, size & 0xFFFF);
     }
+
+    int activeVideoIndex(void) { return _activeVideoIndex; }
 
 // FIXME: AV: they should be removed after finishing multiple video stream support
 // new arcitecture does not assume direct access to video receiver from QML side, even if it works for now
@@ -131,6 +134,7 @@ signals:
     void recordingChanged           ();
     void recordingStarted           ();
     void videoSizeChanged           ();
+    void activeVideoIndexChanged    ();
 
 protected slots:
     void _videoSourceChanged        ();
@@ -180,6 +184,8 @@ protected:
     QString                 _uvcVideoSourceID;
     bool                    _fullScreen             = false;
     Vehicle*                _activeVehicle          = nullptr;
+    int                     _activeVideoIndex       = 0;
+    bool                    _isThermalSource[2]     = { false, false };
 };
 
 #endif

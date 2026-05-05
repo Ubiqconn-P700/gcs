@@ -388,14 +388,17 @@ VideoManager::grabImage(const QString& imageFile)
 //-----------------------------------------------------------------------------
 double VideoManager::aspectRatio()
 {
+    if (_activeVideoIndex == 1) {
+        // 切換到第二來源時，回傳 0 以強迫 UI 使用自動比例，避免被第一來源的相機 Metadata 干擾
+        return 0.0;
+    }
+
     if(_activeVehicle && _activeVehicle->cameraManager()) {
         QGCVideoStreamInfo* pInfo = _activeVehicle->cameraManager()->currentStreamInstance();
         if(pInfo) {
-            qCDebug(VideoManagerLog) << "Primary AR: " << pInfo->aspectRatio();
             return pInfo->aspectRatio();
         }
     }
-    // FIXME: AV: use _videoReceiver->videoSize() to calculate AR (if AR is not specified in the settings?)
     return _videoSettings->aspectRatio()->rawValue().toDouble();
 }
 
@@ -674,12 +677,25 @@ VideoManager::_updateSettings(unsigned id)
     //-- Custom configuration from JSON
     if (_activeVehicle) {
         int vID = _activeVehicle->id();
-        if (_customVideoConfigs.contains(vID)) {
-            QString customUri = _customVideoConfigs[vID];
-            qCDebug(VideoManagerLog) << "Using custom video URI for vehicle" << vID << ":" << customUri;
-            if (_updateVideoUri(id, customUri)) {
-                _videoSettings->videoSource()->setRawValue(VideoSettings::videoSourceRTSP);
-                return true;
+        QString filePath = _toolbox->settingsManager()->appSettings()->savePath()->rawValue().toString() + "/Configs/video_config.json";
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QJsonArray array = QJsonDocument::fromJson(file.readAll()).array();
+            for (int i = 0; i < array.size(); ++i) {
+                QJsonObject obj = array[i].toObject();
+                if (obj["vehicleId"].toInt() == vID) {
+                    QString url = (id == 0) ? obj["rtspUrl"].toString() : obj["rtspUrl2"].toString();
+                    _isThermalSource[id] = (id == 1) ? obj["isThermal"].toBool() : false;
+                    
+                    if (!url.isEmpty()) {
+                        qCDebug(VideoManagerLog) << "Using JSON video URI for id" << id << ":" << url << "isThermal:" << _isThermalSource[id];
+                        if (_updateVideoUri(id, url)) {
+                            _videoSettings->videoSource()->setRawValue(VideoSettings::videoSourceRTSP);
+                            return true;
+                        }
+                    }
+                    break;
+                }
             }
         }
     }
@@ -724,6 +740,7 @@ VideoManager::_updateSettings(unsigned id)
             else if (id == 1) { //-- Thermal stream (if any)
                 QGCVideoStreamInfo* pTinfo = _activeVehicle->cameraManager()->thermalStreamInstance();
                 if (pTinfo) {
+                    _isThermalSource[id] = true;
                     qCDebug(VideoManagerLog) << "Configure secondary stream:" << pTinfo->uri();
                     switch(pTinfo->type()) {
                         case VIDEO_STREAM_TYPE_RTSP:
@@ -752,8 +769,14 @@ VideoManager::_updateSettings(unsigned id)
         settingsChanged |= _updateVideoUri(0, QStringLiteral("udp265://0.0.0.0:%1").arg(_videoSettings->udpPort()->rawValue().toInt()));
     else if (source == VideoSettings::videoSourceMPEGTS)
         settingsChanged |= _updateVideoUri(0, QStringLiteral("mpegts://0.0.0.0:%1").arg(_videoSettings->udpPort()->rawValue().toInt()));
-    else if (source == VideoSettings::videoSourceRTSP)
-        settingsChanged |= _updateVideoUri(0, _videoSettings->rtspUrl()->rawValue().toString());
+    else if (source == VideoSettings::videoSourceRTSP) {
+        if (id == 0) {
+            QString url = (_activeVideoIndex == 0) ? 
+                          _videoSettings->rtspUrl()->rawValue().toString() : 
+                          _videoSettings->rtspUrl2()->rawValue().toString();
+            settingsChanged |= _updateVideoUri(0, url);
+        }
+    }
     else if (source == VideoSettings::videoSourceTCP)
         settingsChanged |= _updateVideoUri(0, QStringLiteral("tcp://%1").arg(_videoSettings->tcpUrl()->rawValue().toString()));
     else if (source == VideoSettings::videoSource3DRSolo)
@@ -767,12 +790,14 @@ VideoManager::_updateSettings(unsigned id)
     else if (source == VideoSettings::videoSourceHerelinkHotspot)
         settingsChanged |= _updateVideoUri(0, QStringLiteral("rtsp://192.168.43.1:8554/fpv_stream"));
     else if (source == VideoSettings::videoDisabled || source == VideoSettings::videoSourceNoVideo)
-        settingsChanged |= _updateVideoUri(0, "");
+        settingsChanged |= _updateVideoUri(id, "");
     else {
-        settingsChanged |= _updateVideoUri(0, "");
-        if (!isUvc()) {
-            qCCritical(VideoManagerLog)
-                << "Video source URI \"" << source << "\" is not supported. Please add support!";
+        if (id == 0) {
+            settingsChanged |= _updateVideoUri(0, "");
+            if (!isUvc()) {
+                qCCritical(VideoManagerLog)
+                    << "Video source URI \"" << source << "\" is not supported. Please add support!";
+            }
         }
     }
 
@@ -985,10 +1010,32 @@ void VideoManager::_loadCustomVideoConfigs()
 }
 void VideoManager::handleKeyAction(int keyCode)
 {
-    qCDebug(VideoManagerLog) << "VideoManager::handleKeyAction received keyCode:" << keyCode;
+    // 根據實體設備日誌，嚴格鎖定僅接受 keyCode 189
+    if (keyCode != 189) {
+        return;
+    }
+
+    qWarning() << "VideoManager::handleKeyAction triggering switch via F1 (189)";
     
-    // 目前先實作簡單的反轉全螢幕邏輯，確認按鍵能從 Java 傳到這裡
-    // setfullScreen(!fullScreen());
+    // 取得第二來源網址
+    QString url2 = _videoSettings->rtspUrl2()->rawValue().toString();
+
+    if (url2.isEmpty()) {
+        qCDebug(VideoManagerLog) << "Secondary RTSP URL is empty, ignoring switch hotkey.";
+        return;
+    }
+
+    // 執行 URL 切換邏輯
+    _activeVideoIndex = (_activeVideoIndex == 0) ? 1 : 0;
+    qWarning() << ">>> [SWITCH] Toggling RTSP source to index:" << _activeVideoIndex;
     
-    qCDebug(VideoManagerLog) << "Full screen toggled to:" << fullScreen();
+    // 先將尺寸歸零，強迫 QML 重新計算佈局，防止影像縮小或拉伸
+    _videoSize = 0;
+    emit videoSizeChanged();
+
+    // 重啟主要影像接收器
+    _restartVideo(0);
+    
+    emit activeVideoIndexChanged();
+    emit aspectRatioChanged();
 }
