@@ -209,5 +209,6 @@
         <file alias="ZoomPlus.svg">src/FlightMap/Images/ZoomPlus.svg</file>
         <file alias="PadBattery.svg">src/ui/toolbar/Images/PadBattery.svg</file>
         <file alias="PadBatteryCharging.svg">src/ui/toolbar/Images/PadBatteryCharging.svg</file>
+        <file alias="SwitchVideo.svg">src/FlightMap/Images/SwitchVideo.svg</file>
     </qresource>
 </RCC>

@@ -37,6 +37,7 @@ public:
     virtual ~VideoManager   ();
 
     Q_INVOKABLE void handleKeyAction(int keyCode);
+    Q_INVOKABLE void toggleVideoSource();
 
     Q_PROPERTY(bool             hasVideo                READ    hasVideo                                    NOTIFY hasVideoChanged)
     Q_PROPERTY(bool             isGStreamer             READ    isGStreamer                                 NOTIFY isGStreamerChanged)

@@ -1011,17 +1011,21 @@ void VideoManager::_loadCustomVideoConfigs()
 void VideoManager::handleKeyAction(int keyCode)
 {
     // 根據實體設備日誌，嚴格鎖定僅接受 keyCode 189
-    if (keyCode != 189) {
-        return;
+    if (keyCode == 189) {
+        qWarning() << "VideoManager::handleKeyAction triggering switch via F1 (189)";
+        toggleVideoSource();
     }
+}
 
-    qWarning() << "VideoManager::handleKeyAction triggering switch via F1 (189)";
-    
+void VideoManager::toggleVideoSource()
+{
+    if (!_videoSettings) return;
+
     // 取得第二來源網址
     QString url2 = _videoSettings->rtspUrl2()->rawValue().toString();
 
     if (url2.isEmpty()) {
-        qCDebug(VideoManagerLog) << "Secondary RTSP URL is empty, ignoring switch hotkey.";
+        qCDebug(VideoManagerLog) << "Secondary RTSP URL is empty, ignoring switch.";
         return;
     }
 

@@ -225,6 +225,41 @@ Item {
         }
     }
 
+    // Video Source Switch Background (Circular)
+    Rectangle {
+        id:                 switchVideoBg
+        anchors.centerIn:   switchVideo
+        width:              switchVideo.width * 1.2
+        height:             width
+        radius:             width / 2
+        color:              _fullItem.pipState.isDark ? Qt.rgba(0,0,0,0.75) : Qt.rgba(0,0,0,0.5)
+        visible:            switchVideo.visible
+        z:                  switchVideo.z - 1
+    }
+
+    // Video Source Switch (RTSP1 <-> RTSP2)
+    Image {
+        id:             switchVideo
+        source:         "/qmlimages/SwitchVideo.svg"
+        mipmap:         true
+        fillMode:       Image.PreserveAspectFit
+        anchors.right:  parent.right
+        anchors.rightMargin: ScreenTools.defaultFontPixelWidth * 0.8
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 0.3
+        visible:        _isExpanded && 
+                        QGroundControl.videoManager.videoSettings.rtspUrl2.rawValue !== "" && 
+                        (ScreenTools.isMobile || pipMouseArea.containsMouse)
+        height:         ScreenTools.defaultFontPixelHeight * 1.8
+        width:          ScreenTools.defaultFontPixelHeight * 1.8
+        sourceSize.height:  height
+        
+        MouseArea {
+            anchors.fill:   parent
+            onClicked:      QGroundControl.videoManager.toggleVideoSource()
+        }
+    }
+
     Rectangle {
         id:                     showPip
         anchors.left :          parent.left
