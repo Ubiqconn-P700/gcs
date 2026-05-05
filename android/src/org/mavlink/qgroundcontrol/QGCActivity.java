@@ -60,6 +60,7 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.app.PendingIntent;
 import android.view.WindowManager;
+import android.view.KeyEvent;
 import android.os.Bundle;
 import android.bluetooth.BluetoothDevice;
 import android.os.storage.StorageManager;
@@ -203,6 +204,8 @@ public class QGCActivity extends QtActivity {
 
     public native void nativeInit();
 
+    public static native void nativeHandleKey(int keyCode, int action);
+
     // QGCActivity singleton
     public QGCActivity() {
         _instance = this;
@@ -295,6 +298,26 @@ public class QGCActivity extends QtActivity {
         // Plug in of USB ACCESSORY triggers only onResume event.
         // Then we scan if there is actually anything new
         probeAccessories();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        int action = event.getAction();
+        String actionStr = (action == KeyEvent.ACTION_DOWN) ? "DOWN"
+                : (action == KeyEvent.ACTION_UP ? "UP" : "UNKNOWN(" + action + ")");
+
+        Log.i(TAG,
+                "dispatchKeyEvent: action=" + actionStr + " keyCode=" + keyCode + " deviceId=" + event.getDeviceId());
+
+        if (keyCode >= 189 && keyCode <= 192) {
+            Log.i(TAG, ">>> [HOTKEY] sending to C++: F" + (keyCode - 188) + " action=" + actionStr);
+            if (action == KeyEvent.ACTION_UP) {
+                nativeHandleKey(keyCode, action);
+            }
+        }
+
+        return super.dispatchKeyEvent(event);
     }
 
     @Override

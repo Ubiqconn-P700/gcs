@@ -36,6 +36,8 @@ public:
     VideoManager    (QGCApplication* app, QGCToolbox* toolbox);
     virtual ~VideoManager   ();
 
+    Q_INVOKABLE void handleKeyAction(int keyCode);
+
     Q_PROPERTY(bool             hasVideo                READ    hasVideo                                    NOTIFY hasVideoChanged)
     Q_PROPERTY(bool             isGStreamer             READ    isGStreamer                                 NOTIFY isGStreamerChanged)
     Q_PROPERTY(bool             isUvc                   READ    isUvc                                       NOTIFY isUvcChanged)

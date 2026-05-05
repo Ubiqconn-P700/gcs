@@ -983,3 +983,12 @@ void VideoManager::_loadCustomVideoConfigs()
         }
     }
 }
+void VideoManager::handleKeyAction(int keyCode)
+{
+    qCDebug(VideoManagerLog) << "VideoManager::handleKeyAction received keyCode:" << keyCode;
+    
+    // 目前先實作簡單的反轉全螢幕邏輯，確認按鍵能從 Java 傳到這裡
+    // setfullScreen(!fullScreen());
+    
+    qCDebug(VideoManagerLog) << "Full screen toggled to:" << fullScreen();
+}

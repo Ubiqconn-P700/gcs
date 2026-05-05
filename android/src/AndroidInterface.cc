@@ -13,6 +13,24 @@
 #include "AndroidInterface.h"
 #include <QAndroidJniObject>
 #include <QtAndroid>
+#include "VideoManager.h"
+#include "QGCToolbox.h"
+
+extern "C" {
+    JNIEXPORT void JNICALL Java_org_mavlink_qgroundcontrol_QGCActivity_nativeHandleKey(JNIEnv* env, jobject obj, jint keyCode, jint action) {
+        Q_UNUSED(env);
+        Q_UNUSED(obj);
+        Q_UNUSED(action);
+        
+        qDebug() << "JNI: nativeHandleKey received keyCode:" << keyCode;
+        
+        // 透過 QGCApplication 取得 VideoManager
+        if (qgcApp() && qgcApp()->toolbox() && qgcApp()->toolbox()->videoManager()) {
+            // 由於 JNI 是在 Java 執行緒呼叫的，我們必須切換到 Qt 的主執行緒執行
+            QMetaObject::invokeMethod(qgcApp()->toolbox()->videoManager(), "handleKeyAction", Q_ARG(int, keyCode));
+        }
+    }
+}
 
 QString AndroidInterface::getSDCardPath()
 {
