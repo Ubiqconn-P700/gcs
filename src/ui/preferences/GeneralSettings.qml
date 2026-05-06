@@ -353,6 +353,18 @@ Rectangle {
                                 }
 
                                 QGCLabel {
+                                    id:         switchKeyLabel
+                                    text:       qsTr("Source Switch Key")
+                                    visible:    rtspUrlLabel.visible
+                                }
+                                FactComboBox {
+                                    Layout.preferredWidth:  _comboFieldWidth
+                                    fact:                   _videoSettings.videoSourceSwitchKey
+                                    indexModel:             false
+                                    visible:                switchKeyLabel.visible
+                                }
+
+                                QGCLabel {
                                     id:         tcpUrlLabel
                                     text:       qsTr("TCP URL")
                                     visible:    !_videoAutoStreamConfig && _isTCP && _videoSettings.tcpUrl.visible

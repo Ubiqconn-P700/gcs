@@ -145,6 +145,15 @@
     "enumValues":       "0,1,2,3,4,5",
     "default":           0,
     "qgcRebootRequired": true
+},
+{
+    "name":             "videoSourceSwitchKey",
+    "shortDesc":        "Video Source Switch Hotkey",
+    "longDesc":         "Physical key to toggle between primary and secondary RTSP video sources.",
+    "type":             "uint32",
+    "enumStrings":      "Disable,F1,F2,F3,F4",
+    "enumValues":       "0,189,190,191,192",
+    "default":           189
 }
 ]
 }

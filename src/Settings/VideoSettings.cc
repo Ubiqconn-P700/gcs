@@ -129,6 +129,8 @@ DECLARE_SETTINGSFACT(VideoSettings, streamEnabled)
 DECLARE_SETTINGSFACT(VideoSettings, disableWhenDisarmed)
 DECLARE_SETTINGSFACT(VideoSettings, lowLatencyMode)
 
+DECLARE_SETTINGSFACT(VideoSettings, videoSourceSwitchKey)
+
 DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
 {
     if (!_videoSourceFact) {

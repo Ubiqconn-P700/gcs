@@ -1010,9 +1010,13 @@ void VideoManager::_loadCustomVideoConfigs()
 }
 void VideoManager::handleKeyAction(int keyCode)
 {
-    // 根據實體設備日誌，嚴格鎖定僅接受 keyCode 189
-    if (keyCode == 189) {
-        qWarning() << "VideoManager::handleKeyAction triggering switch via F1 (189)";
+    if (!_videoSettings) return;
+
+    int configKey = _videoSettings->videoSourceSwitchKey()->rawValue().toInt();
+    
+    // 如果 configKey 為 0 (Disable)，則不執行切換
+    if (configKey != 0 && keyCode == configKey) {
+        qWarning() << "VideoManager::handleKeyAction triggering switch via configured key:" << keyCode;
         toggleVideoSource();
     }
 }
