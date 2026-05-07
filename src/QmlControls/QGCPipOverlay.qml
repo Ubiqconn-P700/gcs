@@ -248,7 +248,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 0.3
         visible:        _isExpanded && 
-                        QGroundControl.videoManager.videoSettings.rtspUrl2.rawValue !== "" && 
+                        QGroundControl.videoManager.canSwitchVideo && 
                         (ScreenTools.isMobile || pipMouseArea.containsMouse)
         height:         ScreenTools.defaultFontPixelHeight * 1.8
         width:          ScreenTools.defaultFontPixelHeight * 1.8

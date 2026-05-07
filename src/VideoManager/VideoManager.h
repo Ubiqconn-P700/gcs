@@ -60,6 +60,7 @@ public:
     Q_PROPERTY(bool             recording               READ    recording                                   NOTIFY recordingChanged)
     Q_PROPERTY(QSize            videoSize               READ    videoSize                                   NOTIFY videoSizeChanged)
     Q_PROPERTY(int              activeVideoIndex        READ    activeVideoIndex                            NOTIFY activeVideoIndexChanged)
+    Q_PROPERTY(bool             canSwitchVideo          READ    canSwitchVideo                              NOTIFY canSwitchVideoChanged)
 
     virtual bool        hasVideo            ();
     virtual bool        isGStreamer         ();
@@ -92,7 +93,9 @@ public:
         return QSize((size >> 16) & 0xFFFF, size & 0xFFFF);
     }
 
-    int activeVideoIndex(void) { return _activeVideoIndex; }
+    int  activeVideoIndex(void) { return _activeVideoIndex; }
+    bool canSwitchVideo(void);
+
 
 // FIXME: AV: they should be removed after finishing multiple video stream support
 // new arcitecture does not assume direct access to video receiver from QML side, even if it works for now
@@ -136,6 +139,8 @@ signals:
     void recordingStarted           ();
     void videoSizeChanged           ();
     void activeVideoIndexChanged    ();
+    void canSwitchVideoChanged      ();
+
 
 protected slots:
     void _videoSourceChanged        ();

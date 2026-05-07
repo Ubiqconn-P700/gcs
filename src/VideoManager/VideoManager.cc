@@ -106,6 +106,9 @@ VideoManager::setToolbox(QGCToolbox *toolbox)
    connect(_videoSettings->tcpUrl(),        &Fact::rawValueChanged, this, &VideoManager::_tcpUrlChanged);
    connect(_videoSettings->aspectRatio(),   &Fact::rawValueChanged, this, &VideoManager::_aspectRatioChanged);
    connect(_videoSettings->lowLatencyMode(),&Fact::rawValueChanged, this, &VideoManager::_lowLatencyModeChanged);
+   // 當 rtspUrl2/rtspUrl3 改變時，即時通知 QML 更新切換按鈕的可見性
+   connect(_videoSettings->rtspUrl2(), &Fact::rawValueChanged, this, [this](){ emit canSwitchVideoChanged(); });
+   connect(_videoSettings->rtspUrl3(), &Fact::rawValueChanged, this, [this](){ emit canSwitchVideoChanged(); });
    MultiVehicleManager *pVehicleMgr = qgcApp()->toolbox()->multiVehicleManager();
    connect(pVehicleMgr, &MultiVehicleManager::activeVehicleChanged, this, &VideoManager::_setActiveVehicle);
 
@@ -684,8 +687,11 @@ VideoManager::_updateSettings(unsigned id)
             for (int i = 0; i < array.size(); ++i) {
                 QJsonObject obj = array[i].toObject();
                 if (obj["vehicleId"].toInt() == vID) {
-                    QString url = (id == 0) ? obj["rtspUrl"].toString() : obj["rtspUrl2"].toString();
-                    _isThermalSource[id] = (id == 1) ? obj["isThermal"].toBool() : false;
+                    QString url;
+                    if (_activeVideoIndex == 0)      url = obj["rtspUrl"].toString();
+                    else if (_activeVideoIndex == 1) url = obj["rtspUrl2"].toString();
+                    else                            url = obj["rtspUrl3"].toString();
+                    _isThermalSource[id] = false;
                     
                     if (!url.isEmpty()) {
                         qCDebug(VideoManagerLog) << "Using JSON video URI for id" << id << ":" << url << "isThermal:" << _isThermalSource[id];
@@ -771,9 +777,10 @@ VideoManager::_updateSettings(unsigned id)
         settingsChanged |= _updateVideoUri(0, QStringLiteral("mpegts://0.0.0.0:%1").arg(_videoSettings->udpPort()->rawValue().toInt()));
     else if (source == VideoSettings::videoSourceRTSP) {
         if (id == 0) {
-            QString url = (_activeVideoIndex == 0) ? 
-                          _videoSettings->rtspUrl()->rawValue().toString() : 
-                          _videoSettings->rtspUrl2()->rawValue().toString();
+            QString url;
+            if (_activeVideoIndex == 0)      url = _videoSettings->rtspUrl()->rawValue().toString();
+            else if (_activeVideoIndex == 1) url = _videoSettings->rtspUrl2()->rawValue().toString();
+            else                            url = _videoSettings->rtspUrl3()->rawValue().toString();
             settingsChanged |= _updateVideoUri(0, url);
         }
     }
@@ -1008,6 +1015,34 @@ void VideoManager::_loadCustomVideoConfigs()
         }
     }
 }
+
+bool VideoManager::canSwitchVideo()
+{
+    if (!_videoSettings) return false;
+
+    // 優先檢查 JSON config
+    if (_activeVehicle) {
+        int vID = _activeVehicle->id();
+        QString filePath = _toolbox->settingsManager()->appSettings()->savePath()->rawValue().toString() + "/Configs/video_config.json";
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QJsonArray array = QJsonDocument::fromJson(file.readAll()).array();
+            for (int i = 0; i < array.size(); ++i) {
+                QJsonObject obj = array[i].toObject();
+                if (obj["vehicleId"].toInt() == vID) {
+                    // JSON 存在且有 rtspUrl2 或 rtspUrl3
+                    return !obj["rtspUrl2"].toString().isEmpty() || !obj["rtspUrl3"].toString().isEmpty();
+                }
+            }
+        }
+    }
+
+    // 否則檢查 QSettings
+    QString url2 = _videoSettings->rtspUrl2()->rawValue().toString().trimmed();
+    QString url3 = _videoSettings->rtspUrl3()->rawValue().toString().trimmed();
+    return !url2.isEmpty() || !url3.isEmpty();
+}
+
 void VideoManager::handleKeyAction(int keyCode)
 {
     if (!_videoSettings) return;
@@ -1025,25 +1060,30 @@ void VideoManager::toggleVideoSource()
 {
     if (!_videoSettings) return;
 
-    // 取得第二來源網址
     QString url2 = _videoSettings->rtspUrl2()->rawValue().toString();
+    QString url3 = _videoSettings->rtspUrl3()->rawValue().toString();
 
-    if (url2.isEmpty()) {
-        qCDebug(VideoManagerLog) << "Secondary RTSP URL is empty, ignoring switch.";
+    // 計算有效的來源數量 (至少需要 2 個才能切換)
+    int sourceCount = 1;
+    if (!url2.isEmpty()) sourceCount = 2;
+    if (!url3.isEmpty()) sourceCount = 3;
+
+    if (sourceCount < 2) {
+        qCDebug(VideoManagerLog) << "Less than 2 RTSP sources configured, ignoring switch.";
         return;
     }
 
-    // 執行 URL 切換邏輯
-    _activeVideoIndex = (_activeVideoIndex == 0) ? 1 : 0;
-    qWarning() << ">>> [SWITCH] Toggling RTSP source to index:" << _activeVideoIndex;
-    
+    // 循環到下一個來源
+    _activeVideoIndex = (_activeVideoIndex + 1) % sourceCount;
+    qWarning() << ">>> [SWITCH] Toggling RTSP source to index:" << _activeVideoIndex << "/ total:" << sourceCount;
+
     // 先將尺寸歸零，強迫 QML 重新計算佈局，防止影像縮小或拉伸
     _videoSize = 0;
     emit videoSizeChanged();
 
     // 重啟主要影像接收器
     _restartVideo(0);
-    
+
     emit activeVideoIndexChanged();
     emit aspectRatioChanged();
 }

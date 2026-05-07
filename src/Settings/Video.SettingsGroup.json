@@ -33,6 +33,13 @@
     "default":   ""
 },
 {
+    "name":             "rtspUrl3",
+    "shortDesc": "Tertiary Video RTSP Url",
+    "longDesc":  "Third RTSP url address for video source cycling (1->2->3->1).",
+    "type":             "string",
+    "default":   ""
+},
+{
     "name":             "tcpUrl",
     "shortDesc": "Video TCP Url",
     "longDesc":  "TCP url address and port to bind to for video stream. Example: 192.168.143.200:3001",

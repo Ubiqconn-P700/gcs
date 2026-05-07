@@ -343,13 +343,24 @@ Rectangle {
 
                                 QGCLabel {
                                     id:         rtspUrl2Label
-                                    text:       qsTr("Secondary RTSP URL")
+                                    text:       qsTr("RTSP URL 2")
                                     visible:    rtspUrlLabel.visible
                                 }
                                 FactTextField {
                                     Layout.preferredWidth:  _comboFieldWidth
                                     fact:                   _videoSettings.rtspUrl2
                                     visible:                rtspUrl2Label.visible
+                                }
+
+                                QGCLabel {
+                                    id:         rtspUrl3Label
+                                    text:       qsTr("RTSP URL 3")
+                                    visible:    rtspUrlLabel.visible
+                                }
+                                FactTextField {
+                                    Layout.preferredWidth:  _comboFieldWidth
+                                    fact:                   _videoSettings.rtspUrl3
+                                    visible:                rtspUrl3Label.visible
                                 }
 
                                 QGCLabel {
