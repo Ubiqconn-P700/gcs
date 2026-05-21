@@ -150,6 +150,14 @@ Rectangle {
                             }
 
                             FactCheckBox {
+                                text:       qsTr("Show Instrument Panel")
+                                visible:    _showInstrumentPanel.visible
+                                fact:       _showInstrumentPanel
+
+                                property Fact _showInstrumentPanel: QGroundControl.settingsManager.flyViewSettings.showInstrumentPanel
+                            }
+
+                            FactCheckBox {
                                 text:       qsTr("Use Vertical Instrument Panel")
                                 visible:    _alternateInstrumentPanel.visible
                                 fact:       _alternateInstrumentPanel
