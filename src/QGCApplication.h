@@ -1,11 +1,12 @@
 #pragma once
 
 #include <QtCore/QElapsedTimer>
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QMap>
 #include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtCore/QTranslator>
-#include <QtWidgets/QApplication>
+#include <QtGui/QGuiApplication>
 
 namespace QGCCommandLineParser {
     struct CommandLineParseResult;
@@ -23,7 +24,7 @@ struct QMetaObject;
 #if defined(qApp)
 #undef qApp
 #endif
-#define qApp (static_cast<QGCApplication*>(QApplication::instance()))
+#define qApp (static_cast<QGCApplication*>(QGuiApplication::instance()))
 
 #if defined(qGuiApp)
 #undef qGuiApp
@@ -32,10 +33,9 @@ struct QMetaObject;
 
 #define qgcApp() qApp
 
-/// The main application and management class.
-/// Needs QApplication base to support QtCharts module.
-/// TODO: Use QtGraphs to convert to QGuiApplication
-class QGCApplication : public QApplication
+/// \brief The main application and management class.
+///
+class QGCApplication : public QGuiApplication
 {
     Q_OBJECT
 
@@ -116,6 +116,8 @@ private:
 
     bool _initVideo();
 
+    bool _initQmlRootWindow();
+
     /// Initialize the application for normal application boot. Or in other words we are not going to run unit tests.
     void _initForNormalAppBoot();
 
@@ -172,3 +174,5 @@ private:
 
     const QString _qgcImageProviderId = QStringLiteral("QGCImages");
 };
+
+Q_DECLARE_LOGGING_CATEGORY(QGCAppMessageLog)

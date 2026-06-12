@@ -1,3 +1,4 @@
+#include "JsonParsing.h"
 #include "QGCApplication.h"
 #include "qgc_version.h"
 
@@ -8,7 +9,6 @@
 #include <QtCore/QRegularExpression>
 #include <QtGui/QFontDatabase>
 #include <QtGui/QIcon>
-#include <QtGui/QOpenGLContext>
 #include "QGCNetworkHelper.h"
 #include <QtQml/QQmlApplicationEngine>
 #include <QtQml/QQmlContext>
@@ -20,11 +20,9 @@
 #include <QtCore/private/qthread_p.h>
 
 #include "LogManager.h"
-#include "LogRemoteSink.h"
 #include "AudioOutput.h"
 #include "FollowMe.h"
 #include "JoystickManager.h"
-#include "JsonHelper.h"
 #include "LinkManager.h"
 #include "MAVLinkProtocol.h"
 #include "MultiVehicleManager.h"
@@ -33,6 +31,7 @@
 #include "QGCCommandLineParser.h"
 #include "QGCCorePlugin.h"
 #include "QGCFileDownload.h"
+#include "ColoredSvgImageProvider.h"
 #include "QGCImageProvider.h"
 #include "QGCLoggingCategory.h"
 #include "QGCLoggingCategoryManager.h"
@@ -49,9 +48,10 @@
 #endif
 
 QGC_LOGGING_CATEGORY(QGCApplicationLog, "API.QGCApplication")
+QGC_LOGGING_CATEGORY(QGCAppMessageLog, "API.QGCApplication.AppMessage")
 
 QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLineParser::CommandLineParseResult &cli)
-    : QApplication(argc, argv)
+    : QGuiApplication(argc, argv)
     , _runningUnitTests(cli.runningUnitTests)
     , _simpleBootTest(cli.simpleBootTest)
     , _fakeMobile(cli.fakeMobile)
@@ -153,6 +153,11 @@ QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLinePars
     QGCLoggingCategoryManager::init();
     QGCLoggingCategoryManager::instance()->installFilter(loggingOptions);
 
+    if (_runningUnitTests) {
+        // Enable the AppMessage category so showAppMessage() debug logs are visible during unit tests.
+        QGCLoggingCategoryManager::instance()->setCategoryEnabled(QStringLiteral("API.QGCApplication.AppMessage"), true);
+    }
+
     // We need to set language as early as possible prior to loading on JSON files.
     setLanguage();
 
@@ -184,7 +189,7 @@ void QGCApplication::setLanguage()
         }
     }
     qCDebug(QGCApplicationLog) << "Loading localizations for" << _locale.name();
-    removeTranslator(JsonHelper::translator());
+    removeTranslator(JsonParsing::translator());
     removeTranslator(&_qgcTranslatorSourceCode);
     removeTranslator(&_qgcTranslatorQtLibs);
     if (_locale.name() != "en_US") {
@@ -199,8 +204,8 @@ void QGCApplication::setLanguage()
         } else {
             qCWarning(QGCApplicationLog) << "Error loading source localization for" << _locale.name();
         }
-        if (JsonHelper::translator()->load(_locale, QLatin1String("qgc_json_"), "", ":/i18n")) {
-            installTranslator(JsonHelper::translator());
+        if (JsonParsing::translator()->load(_locale, QLatin1String("qgc_json_"), "", ":/i18n")) {
+            installTranslator(JsonParsing::translator());
         } else {
             qCWarning(QGCApplicationLog) << "Error loading json localization for" << _locale.name();
         }
@@ -226,44 +231,7 @@ void QGCApplication::init()
         SettingsManager::instance()->mavlinkSettings()->gcsMavlinkSystemID()->setRawValue(_systemId);
     }
 
-    // Set up log directory for disk logging and SQLite store, and re-apply on path change
-    {
-        auto *logMgr = LogManager::instance();
-        auto *appSettings = SettingsManager::instance()->appSettings();
-        logMgr->setLogDirectory(appSettings->logSavePath());
-        QObject::connect(appSettings, &AppSettings::savePathsChanged, logMgr, [logMgr, appSettings]() {
-            logMgr->setLogDirectory(appSettings->logSavePath());
-        });
-    }
-
-    // Wire remote logging settings to the sink
-    {
-        auto *appSettings = SettingsManager::instance()->appSettings();
-        auto *sink = LogManager::instance()->remoteSink();
-        auto applySetting = [appSettings, sink]() {
-            sink->setHost(appSettings->remoteLoggingHost()->rawValue().toString());
-            sink->setPort(static_cast<quint16>(appSettings->remoteLoggingPort()->rawValue().toUInt()));
-            sink->setProtocol(static_cast<TransportStrategy::Protocol>(
-                appSettings->remoteLoggingProtocol()->rawValue().toInt()));
-            sink->setVehicleId(appSettings->remoteLoggingVehicleId()->rawValue().toString());
-            sink->setTlsEnabled(appSettings->remoteLoggingTlsEnabled()->rawValue().toBool());
-            sink->setTlsVerifyPeer(appSettings->remoteLoggingTlsVerifyPeer()->rawValue().toBool());
-            sink->setCompressionEnabled(appSettings->remoteLoggingCompressionEnabled()->rawValue().toBool());
-            sink->setCompressionLevel(appSettings->remoteLoggingCompressionLevel()->rawValue().toInt());
-            sink->setEnabled(appSettings->remoteLoggingEnabled()->rawValue().toBool());
-        };
-        for (auto *fact : {
-                 appSettings->remoteLoggingEnabled(),    appSettings->remoteLoggingHost(),
-                 appSettings->remoteLoggingPort(),       appSettings->remoteLoggingProtocol(),
-                 appSettings->remoteLoggingVehicleId(),  appSettings->remoteLoggingTlsEnabled(),
-                 appSettings->remoteLoggingTlsVerifyPeer(),
-                 appSettings->remoteLoggingCompressionEnabled(),
-                 appSettings->remoteLoggingCompressionLevel(),
-             }) {
-            QObject::connect(fact, &Fact::rawValueChanged, sink, applySetting);
-        }
-        applySetting();
-    }
+    LogManager::instance()->init();
 
     // Although this should really be in _initForNormalAppBoot putting it here allowws us to create unit tests which pop up more easily
     if (QFontDatabase::addApplicationFont(":/fonts/opensans") < 0) {
@@ -277,7 +245,9 @@ void QGCApplication::init()
     if (_simpleBootTest) {
         // Since GStream builds are so problematic we initialize video during the simple boot test
         // to make sure it works and verfies plugin availability.
-        _bootTestPassed = _initVideo();
+        const bool videoInitialized = _initVideo();
+        const bool qmlRootLoaded = _initQmlRootWindow();
+        _bootTestPassed = videoInitialized && qmlRootLoaded;
     } else if (!_runningUnitTests) {
         _initForNormalAppBoot();
     }
@@ -286,47 +256,7 @@ void QGCApplication::init()
 bool QGCApplication::_initVideo()
 {
 #ifdef QGC_GST_STREAMING
-    // GStreamer video rendering backend selection:
-    //  - Windows D3D11: native RHI, no OpenGL needed.
-    //  - macOS: appsink → QVideoSink → Metal RHI VideoOutput, no OpenGL needed.
-    //  - Linux/other: qml6glsink requires OpenGL. Probe for a working GL context
-    //    and fall back to the default graphics API if unavailable.
-    //
-    // The offscreen platform (used in CI boot tests) never provides a real
-    // GL context, so skip the probe there — just set OpenGL API to exercise
-    // the full GStreamer init path.
-    const bool isOffscreen = (qApp->platformName() == QLatin1String("offscreen"));
-
-#if defined(QGC_GST_D3D11_SINK)
-    // D3D11 sink renders via Qt's native D3D11 RHI — no OpenGL needed.
-    if (isOffscreen) {
-        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-    }
-    qCDebug(QGCApplicationLog) << "D3D11 video sink available, using default graphics API";
-#elif defined(Q_OS_MACOS)
-    // macOS Metal rendering path: appsink → QVideoSink → VideoOutput.
-    // Do NOT force OpenGL — let Qt use the default Metal RHI backend.
-    // The appsink path in qgcvideosinkbin avoids the GL-dependent qml6glsink.
-    if (isOffscreen) {
-        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-    } else {
-        qCDebug(QGCApplicationLog) << "macOS: using default RHI backend (Metal) for appsink video path";
-    }
-#else
-    const bool skipGLProbe = isOffscreen;
-
-    if (skipGLProbe) {
-        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-    } else {
-        QOpenGLContext testCtx;
-        if (testCtx.create()) {
-            QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
-        } else {
-            qCWarning(QGCApplicationLog) << "OpenGL not available; GStreamer video will be disabled."
-                                         << "Using default graphics API (Metal/Vulkan).";
-        }
-    }
-#endif  // QGC_GST_D3D11_SINK / Q_OS_MACOS
+    qCDebug(QGCApplicationLog) << "Using default graphics API for appsink → VideoOutput video path";
 #endif
 
     QGCCorePlugin::instance();  // CorePlugin must be initialized before VideoManager for Video Cleanup
@@ -337,26 +267,35 @@ bool QGCApplication::_initVideo()
     return initSucceeded;
 }
 
-void QGCApplication::_initForNormalAppBoot()
+bool QGCApplication::_initQmlRootWindow()
 {
-    (void) _initVideo();
-
     QQuickStyle::setStyle("Basic");
     QGCCorePlugin::instance()->init();
     MAVLinkProtocol::instance()->init();
     MultiVehicleManager::instance()->init();
     _qmlAppEngine = QGCCorePlugin::instance()->createQmlApplicationEngine(this);
     QObject::connect(_qmlAppEngine, &QQmlApplicationEngine::objectCreationFailed, this, QCoreApplication::quit, Qt::QueuedConnection);
+
+    // Must register before createRootWindow — root QML references QGCColoredImage which resolves image://coloredsvg/... at load time.
+    _qmlAppEngine->addImageProvider(_qgcImageProviderId, new QGCImageProvider());
+    _qmlAppEngine->addImageProvider(QLatin1String(ColoredSvgImageProvider::ProviderId), new ColoredSvgImageProvider());
+
     QGCCorePlugin::instance()->createRootWindow(_qmlAppEngine);
+
+    return mainRootWindow() != nullptr;
+}
+
+void QGCApplication::_initForNormalAppBoot()
+{
+    (void) _initVideo();
+
+    (void) _initQmlRootWindow();
 
     AudioOutput::instance()->init(SettingsManager::instance()->appSettings()->audioVolume(), SettingsManager::instance()->appSettings()->audioMuted());
     FollowMe::instance()->init();
     QGCPositionManager::instance()->init();
     LinkManager::instance()->init();
     VideoManager::instance()->init(mainRootWindow());
-
-    // Image provider for Optical Flow
-    _qmlAppEngine->addImageProvider(_qgcImageProviderId, new QGCImageProvider());
 
     // Set the window icon now that custom plugin has a chance to override it
 #ifdef Q_OS_LINUX
@@ -478,15 +417,19 @@ void QGCApplication::showAppMessage(const QString &message, const QString &title
 {
     const QString dialogTitle = title.isEmpty() ? applicationName() : title;
 
+    if (runningUnitTests()) {
+        // Never show a blocking dialog during unit tests — it would hang the test runner.
+        // Logged under QGCAppMessageLog so tests can use expectAppMessage() to white-list
+        // expected dialogs without matching against the general QGCApplication category.
+        qCDebug(QGCAppMessageLog) << "showAppMessage:" << dialogTitle << "-" << message;
+        return;
+    }
+
     QObject *const rootQmlObject = _rootQmlObject();
     if (rootQmlObject) {
         QVariant varReturn;
         QVariant varMessage = QVariant::fromValue(message);
         QMetaObject::invokeMethod(rootQmlObject, "_showMessageDialog", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, dialogTitle), Q_ARG(QVariant, varMessage));
-    } else if (runningUnitTests()) {
-        // Unit tests can run without UI
-        // We don't use a logging category to make it easier to debug unit tests
-        qDebug() << "QGCApplication::showAppMessage unittest title:message" << dialogTitle << message;
     } else {
         // UI isn't ready yet
         _delayedAppMessages.append(QPair<QString, QString>(dialogTitle, message));
@@ -682,12 +625,12 @@ QT_WARNING_DISABLE_DEPRECATED
 bool QGCApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventList *postedEvents)
 {
     if (event->type() != QEvent::MetaCall) {
-        return QApplication::compressEvent(event, receiver, postedEvents);
+        return QGuiApplication::compressEvent(event, receiver, postedEvents);
     }
 
     const QMetaCallEvent *mce = static_cast<QMetaCallEvent*>(event);
     if (!mce->sender() || !_compressedSignals.contains(mce->sender()->metaObject(), mce->signalId())) {
-        return QApplication::compressEvent(event, receiver, postedEvents);
+        return QGuiApplication::compressEvent(event, receiver, postedEvents);
     }
 
     for (QPostEventList::iterator it = postedEvents->begin(); it != postedEvents->end(); ++it) {
@@ -723,7 +666,7 @@ bool QGCApplication::event(QEvent *e)
 {
     if (e->type() == QEvent::Quit) {
         if (!_mainRootWindow) {
-            return QApplication::event(e);
+            return QGuiApplication::event(e);
         }
         // On OSX if the user selects Quit from the menu (or Command-Q) the ApplicationWindow does not signal closing. Instead you get a Quit event here only.
         // This in turn causes the standard QGC shutdown sequence to not run. So in this case we close the window ourselves such that the
@@ -741,7 +684,7 @@ bool QGCApplication::event(QEvent *e)
         }
     }
 
-    return QApplication::event(e);
+    return QGuiApplication::event(e);
 }
 
 QGCImageProvider *QGCApplication::qgcImageProvider()
@@ -794,4 +737,3 @@ void QGCApplication::shutdown()
     // This is bad, but currently qobject inheritances are incorrect and cause crashes on exit without
     delete _qmlAppEngine;
 }
-

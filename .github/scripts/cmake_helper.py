@@ -6,6 +6,7 @@ Subcommands:
     configure   Run configure.py with standardized arguments
     detect-jobs Detect number of parallel jobs for the current platform
     ctest       Run CTest with standardized arguments and timing
+    cache-var   Read a CMake cache variable from CMakeCache.txt
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -22,6 +25,26 @@ from ci_bootstrap import ensure_tools_dir
 ensure_tools_dir(__file__)
 
 from common.gh_actions import append_github_env, write_github_output  # noqa: E402
+
+
+def _run_with_tee(cmd: list[str], output_file: str) -> int:
+    # Use `bash | tee` so children keep a real stdout — Popen+PIPE deadlocks
+    # Gradle/javac on Windows when grandchildren block-buffer 8KB+ output.
+    bash = shutil.which("bash")
+    if bash:
+        quoted_cmd = " ".join(shlex.quote(c) for c in cmd)
+        quoted_log = shlex.quote(output_file)
+        script = f"set -o pipefail; {quoted_cmd} 2>&1 | tee {quoted_log}"
+        return subprocess.run([bash, "-c", script], check=False).returncode
+
+    with open(output_file, "w", encoding="utf-8") as log:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            log.write(line)
+        proc.wait()
+        return proc.returncode
 
 
 def detect_jobs(requested: str = "auto") -> int:
@@ -72,13 +95,7 @@ def cmd_build(args: argparse.Namespace) -> None:
     start = time.monotonic()
 
     if output_file:
-        with open(output_file, "w") as log:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                log.write(line)
-            proc.wait()
-            exit_code = proc.returncode
+        exit_code = _run_with_tee(cmd, output_file)
     else:
         result = subprocess.run(cmd, check=False)
         exit_code = result.returncode
@@ -136,28 +153,58 @@ def cmd_ctest(args: argparse.Namespace) -> None:
         cmd += ["-L", args.include_labels]
     if args.exclude_labels:
         cmd += ["-LE", args.exclude_labels]
-    if args.shard_index or args.shard_count:
-        if not (args.shard_index and args.shard_count):
-            print("::error::Both --shard-index and --shard-count must be specified together")
-            sys.exit(1)
-        if args.shard_index < 1 or args.shard_index > args.shard_count:
-            print(f"::error::--shard-index must be between 1 and --shard-count ({args.shard_count})")
-            sys.exit(1)
-        cmd += ["-I", f"{args.shard_index},,{args.shard_count}"]
 
     start = time.monotonic()
-
-    with open(args.ctest_output, "w") as log:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        for line in proc.stdout:
-            sys.stdout.write(line)
-            log.write(line)
-        proc.wait()
-        exit_code = proc.returncode
-
+    exit_code = _run_with_tee(cmd, args.ctest_output)
     duration = int(time.monotonic() - start)
     print(f"::notice::Tests completed in {duration}s")
     sys.exit(exit_code)
+
+
+_CACHE_LINE_RE = re.compile(r"^([A-Za-z0-9_.\-]+):[^=]+=(.*)$")
+
+
+def read_cache_var(cache_path: str, name: str) -> str | None:
+    """Return the value of a CMake cache variable, or None if not set."""
+    try:
+        with open(cache_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                match = _CACHE_LINE_RE.match(line.rstrip("\n"))
+                if match and match.group(1) == name:
+                    return match.group(2)
+    except FileNotFoundError:
+        return None
+    return None
+
+
+def read_cache_dict(cache_path: str) -> dict[str, str]:
+    """Return all typed entries from CMakeCache.txt as a flat name->value dict."""
+    entries: dict[str, str] = {}
+    try:
+        with open(cache_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                match = _CACHE_LINE_RE.match(line.rstrip("\n"))
+                if match:
+                    entries[match.group(1)] = match.group(2)
+    except FileNotFoundError:
+        pass
+    return entries
+
+
+def cmd_cache_var(args: argparse.Namespace) -> None:
+    cache_path = os.path.join(args.build_dir, "CMakeCache.txt")
+    value = read_cache_var(cache_path, args.name)
+    if value is None:
+        if args.default is not None:
+            value = args.default
+        elif args.required:
+            print(f"::error::CMake cache variable {args.name} not found in {cache_path}",
+                  file=sys.stderr)
+            sys.exit(1)
+        else:
+            value = ""
+    print(value)
+    write_github_output({args.output_key or args.name.lower(): value})
 
 
 def main() -> None:
@@ -200,8 +247,14 @@ def main() -> None:
     p_ctest.add_argument("--jobs", type=int, required=True)
     p_ctest.add_argument("--include-labels", default="")
     p_ctest.add_argument("--exclude-labels", default="")
-    p_ctest.add_argument("--shard-index", type=int, default=0, help="Shard index (1-based)")
-    p_ctest.add_argument("--shard-count", type=int, default=0, help="Total shard count")
+
+    # cache-var
+    p_cv = sub.add_parser("cache-var", help="Read a CMakeCache.txt variable")
+    p_cv.add_argument("--build-dir", required=True)
+    p_cv.add_argument("--name", required=True, help="Cache variable name (case-sensitive)")
+    p_cv.add_argument("--default", default=None, help="Fallback when the variable is missing")
+    p_cv.add_argument("--required", action="store_true", help="Exit 1 if missing and no --default")
+    p_cv.add_argument("--output-key", default="", help="GITHUB_OUTPUT key (default: lowercase name)")
 
     args = parser.parse_args()
     commands = {
@@ -209,6 +262,7 @@ def main() -> None:
         "build": cmd_build,
         "configure": cmd_configure,
         "ctest": cmd_ctest,
+        "cache-var": cmd_cache_var,
     }
     commands[args.command](args)
 

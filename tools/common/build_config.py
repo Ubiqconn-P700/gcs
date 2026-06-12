@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
+
+from .io import read_json
 
 CONFIG_ENV_VAR = "CONFIG_FILE"
 CONFIG_RELATIVE_PATH = Path(".github") / "build-config.json"
@@ -16,6 +17,7 @@ DEFAULT_EXPORT_KEYS = [
     "gstreamer_minimum_version",
     "gstreamer_default_version",
     "gstreamer_macos_version",
+    "gstreamer_ios_version",
     "gstreamer_android_version",
     "gstreamer_windows_version",
     "xcode_version",
@@ -32,7 +34,7 @@ DEFAULT_EXPORT_KEYS = [
     "ios_deployment_target",
     "platform_workflows",
 ]
-IOS_QT_MODULE_EXCLUDES = {"qtserialport", "qtscxml"}
+IOS_QT_MODULE_EXCLUDES = {"qtserialport"}
 
 
 def find_build_config(
@@ -69,8 +71,7 @@ def load_build_config(
 ) -> dict[str, Any]:
     """Load and parse the build config JSON file."""
     path = config_file or find_build_config(start, extra_candidates=extra_candidates)
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
+    data = read_json(path)
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object in {path}")
     return data
@@ -84,10 +85,15 @@ def get_build_config_value(
     start: Path | None = None,
     extra_candidates: list[Path] | None = None,
 ) -> str:
-    """Return a string value from the build config or *default*."""
+    """Return a string value from the build config or *default*.
+
+    File-missing / unreadable → silent default (callers may run outside the repo).
+    Parse / schema errors → raise: an existing-but-corrupted config silently
+    swapping defaults can produce wrong artifacts without warning.
+    """
     try:
         config = load_build_config(config_file, start=start, extra_candidates=extra_candidates)
-    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError):
+    except (FileNotFoundError, OSError):
         return default
     value = config.get(key, default)
     return str(value) if value is not None else default

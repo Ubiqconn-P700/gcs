@@ -31,6 +31,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         APMHeliComponent.h
         APMLightsComponent.cc
         APMLightsComponent.h
+        APMLoggingComponent.cc
+        APMLoggingComponent.h
         APMMotorComponent.cc
         APMMotorComponent.h
         APMServoComponent.cc
@@ -62,7 +64,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
 # ----------------------------------------------------------------------------
 # Code-generation: produce QML config pages from VehicleConfig.json definitions
 # ----------------------------------------------------------------------------
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(APM_CONFIG_QML_GENERATOR_DIR "${CMAKE_SOURCE_DIR}/tools/generators/config_qml")
 set(APM_CONFIG_PAGES_DIR         "${CMAKE_CURRENT_SOURCE_DIR}/VehicleConfig")
@@ -80,37 +81,21 @@ file(GLOB _apm_config_page_definitions CONFIGURE_DEPENDS "${APM_CONFIG_PAGES_DIR
 # Generated QML outputs (must match what generate_pages.py produces)
 set(_apm_config_generated_qml_names
     APMFailsafesComponent.qml
+    APMLoggingComponent.qml
     APMPowerComponent.qml
     APMFlightSafetyComponent.qml
     APMTuningCopterComponent.qml
 )
 
-# Full paths in the build tree
-set(_apm_config_generated_qml "")
-foreach(_name IN LISTS _apm_config_generated_qml_names)
-    list(APPEND _apm_config_generated_qml "${APM_CONFIG_QML_GEN_DIR}/${_name}")
-endforeach()
-
-add_custom_command(
-    OUTPUT  ${_apm_config_generated_qml}
-    COMMAND ${Python3_EXECUTABLE} -m tools.generators.config_qml.generate_pages
-            --pages-dir "${APM_CONFIG_PAGES_DIR}"
-            --output-dir "${APM_CONFIG_QML_GEN_DIR}"
-    DEPENDS ${_apm_config_generator_sources} ${_apm_config_page_definitions}
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    COMMENT "Generating APM QML config pages from VehicleConfig.json definitions"
-    VERBATIM
+qgc_add_qml_codegen(GenerateConfigQmlAPM
+    GENERATOR_MODULE tools.generators.config_qml.generate_pages
+    OUTPUT_DIR       "${APM_CONFIG_QML_GEN_DIR}"
+    QML_NAMES        ${_apm_config_generated_qml_names}
+    EXTRA_ARGS       --pages-dir "${APM_CONFIG_PAGES_DIR}"
+    DEPENDS          ${_apm_config_generator_sources} ${_apm_config_page_definitions}
+    COMMENT          "Generating APM QML config pages from VehicleConfig.json definitions"
 )
-
-add_custom_target(GenerateConfigQmlAPM DEPENDS ${_apm_config_generated_qml})
-
-# Set QT_RESOURCE_ALIAS so qt_add_qml_module places generated files at the
-# correct QRC path despite living in the build tree.
-foreach(_name IN LISTS _apm_config_generated_qml_names)
-    set_source_files_properties("${APM_CONFIG_QML_GEN_DIR}/${_name}"
-        PROPERTIES QT_RESOURCE_ALIAS "${_name}"
-    )
-endforeach()
+set(_apm_config_generated_qml ${GenerateConfigQmlAPM_OUTPUTS})
 
 # ----------------------------------------------------------------------------
 # APM QML Module
@@ -166,11 +151,11 @@ qt_add_qml_module(AutoPilotPluginsAPMModule
         APMSubFrameComponent.qml
         APMSubFrameComponentSummary.qml
         APMSubMotorComponent.qml
-        APMTuningComponentSub.qml
         APMAutoTuneChannelSelector.qml
         APMAdvancedTuningCopterComponent.qml
     RESOURCES
         VehicleConfig/APMFailsafes.VehicleConfig.json
+        VehicleConfig/APMLogging.VehicleConfig.json
         VehicleConfig/APMPower.VehicleConfig.json
         VehicleConfig/APMFlightSafety.VehicleConfig.json
         VehicleConfig/APMTuningCopter.VehicleConfig.json
@@ -183,4 +168,48 @@ qt_add_qml_module(AutoPilotPluginsAPMModule
 qt_add_resources(${CMAKE_PROJECT_NAME} autopilot_plugin_apm_resource
     PREFIX "/json"
     FILES APMFollowComponent.FactMetaData.json
+)
+
+qt_add_resources(${CMAKE_PROJECT_NAME} autopilot_plugin_apm_images
+    PREFIX "/res"
+    BASE "${CMAKE_SOURCE_DIR}/resources"
+    FILES
+        "${CMAKE_SOURCE_DIR}/resources/helicoptericon.svg"
+)
+
+# Sub frame images: registered under URL /qmlimages/Frames/<NiceName>.png with
+# on-disk filenames mapped via QT_RESOURCE_ALIAS.
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/bluerov-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "BlueROV1.png")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple3-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "SimpleROV-3.png")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple4-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "SimpleROV-4.png")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple5-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "SimpleROV-5.png")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/vectored-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "Vectored.png")
+set_source_files_properties("${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/vectored6dof-frame.png"
+    PROPERTIES QT_RESOURCE_ALIAS "Vectored6DOF.png")
+
+qt_add_resources(${CMAKE_PROJECT_NAME} autopilot_plugin_apm_frames
+    PREFIX "/qmlimages/Frames"
+    BASE "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images"
+    FILES
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/bluerov-frame.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple3-frame.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple4-frame.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/simple5-frame.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/vectored-frame.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/vectored6dof-frame.png"
+)
+
+qt_add_resources(${CMAKE_PROJECT_NAME} autopilot_plugin_apm_qmlimages
+    PREFIX "/qmlimages"
+    BASE "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images"
+    FILES
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/ForwardingSupportIcon.svg"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/ForwardingSupportIconGreen.svg"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/LightsComponentIcon.png"
+        "${CMAKE_SOURCE_DIR}/src/AutoPilotPlugins/APM/Images/SubFrameComponentIcon.png"
 )

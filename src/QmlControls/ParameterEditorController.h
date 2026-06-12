@@ -132,6 +132,7 @@ class ParameterEditorController : public FactPanelController
     Q_PROPERTY(QAbstractTableModel* parameters              MEMBER _parameters                                          NOTIFY parametersChanged)
     Q_PROPERTY(bool                 showModifiedOnly        MEMBER _showModifiedOnly                                    NOTIFY showModifiedOnlyChanged)
     Q_PROPERTY(bool                 showFavoritesOnly       MEMBER _showFavoritesOnly                                   NOTIFY showFavoritesOnlyChanged)
+    Q_PROPERTY(bool                 hideReadOnly            MEMBER _hideReadOnly                                        NOTIFY hideReadOnlyChanged)
     Q_PROPERTY(QStringList          favoriteParameterNames  READ favoriteParameterNames                                 NOTIFY favoritesChanged)
 
     // These property are related to the diff associated with a load from file
@@ -168,15 +169,18 @@ signals:
     void currentGroupChanged            (void);
     void showModifiedOnlyChanged        (void);
     void showFavoritesOnlyChanged       (void);
+    void hideReadOnlyChanged            (void);
     void favoritesChanged               (void);
     void diffOtherVehicleChanged        (bool diffOtherVehicle);
     void diffMultipleComponentsChanged  (bool diffMultipleComponents);
     void parametersChanged              (void);
+    void missingParamsFromFile          (const QStringList& missingParams);
 
 private slots:
     void _currentCategoryChanged(void);
     void _currentGroupChanged   (void);
     void _searchTextChanged     (void);
+    void _hideReadOnlyChanged   (void);
     void _buildLists            (void);
     void _buildListsForComponent(int compId);
     void _factAdded             (int compId, Fact* fact);
@@ -195,8 +199,10 @@ private:
     ParameterEditorGroup*       _currentGroup           = nullptr;
     bool                        _showModifiedOnly       = false;
     bool                        _showFavoritesOnly      = false;
+    bool                        _hideReadOnly           = false;
     bool                        _diffOtherVehicle       = false;
     bool                        _diffMultipleComponents = false;
+    QStringList                 _diffMissingParams;
     QSet<QString>               _favoriteNames;
 
     QmlObjectListModel          _categories;

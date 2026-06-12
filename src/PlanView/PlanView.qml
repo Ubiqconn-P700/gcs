@@ -11,6 +11,7 @@ import QGroundControl.FlightMap
 import QGroundControl.Controls
 import QGroundControl.FactControls
 import QGroundControl.FlyView
+import QGroundControl.Geo
 import QGroundControl.Toolbar
 
 Item {
@@ -26,14 +27,13 @@ Item {
     property var    _geoFenceController: _planMasterController.geoFenceController
     property var    _rallyPointController: _planMasterController.rallyPointController
     property var    _visualItems: _missionController.visualItems
-    property bool   _singleComplexItem: _missionController.complexMissionItemNames.length === 1
+    property bool   _singleComplexItem: _missionController.complexMissionItems.length === 1
     property int    _editingLayer: _layerMission
     property var    _appSettings: QGroundControl.settingsManager.appSettings
     property var    _planViewSettings: QGroundControl.settingsManager.planViewSettings
     property bool   _promptForPlanUsageShowing: false
     property bool   _addROIOnClick: false
     property bool   _addWaypointOnClick: false
-    property bool   _homePositionSet: _missionController.homePositionSet
 
     readonly property int _layerMission: 1
     readonly property int _layerFence: 2
@@ -239,6 +239,7 @@ Item {
 
         FlightMap {
             id: editorMap
+            objectName: "planView_map"
             anchors.fill: parent
             mapName: "MissionEditor"
             allowGCSLocationCenter: true
@@ -283,7 +284,7 @@ Item {
 
                 switch (_editingLayer) {
                 case _layerMission:
-                    if (_planMasterController.readyForPlanCreation) {
+                    if (_planMasterController.showCreateFromTemplate) {
                         _missionController.setHomePosition(coordinate)
                     } else if (_addROIOnClick) {
                         _addROIOnClick = false
@@ -435,52 +436,57 @@ Item {
                 id: toolStripActionList
                 model: [
                     ToolStripAction {
+                        objectName: "planToolStrip_takeoffButton"
                         text: qsTr("Takeoff")
                         iconSource: "/res/takeoff.svg"
-                        enabled: _homePositionSet && _missionController.isInsertTakeoffValid
+                        enabled: _missionController.isInsertTakeoffValid
                         visible: toolStrip._isMissionLayer && !_planMasterController.controllerVehicle.rover
                         onTriggered: {
                             insertTakeoffItemAfterCurrent()
                         }
                     },
                     ToolStripAction {
-                        text: _singleComplexItem ? _missionController.complexMissionItemNames[0] : qsTr("Pattern")
+                        objectName: "planToolStrip_patternButton"
+                        text: _singleComplexItem ? _missionController.complexMissionItems[0].translatedName : qsTr("Pattern")
                         iconSource: "/qmlimages/MapDrawShape.svg"
-                        enabled: _homePositionSet && _missionController.flyThroughCommandsAllowed
+                        enabled: _missionController.flyThroughCommandsAllowed
                         visible: toolStrip._isMissionLayer
                         dropPanelComponent: _singleComplexItem ? undefined : patternDropPanel
                         onTriggered: {
                             if (_singleComplexItem) {
-                                insertComplexItemAfterCurrent(_missionController.complexMissionItemNames[0])
+                                insertComplexItemAfterCurrent(_missionController.complexMissionItems[0].canonicalName)
                             }
                         }
                     },
                     ToolStripAction {
                         id: waypointButton
+                        objectName: "planToolStrip_waypointButton"
                         text: qsTr("Waypoint")
                         iconSource: "/res/waypoint.svg"
-                        enabled: _homePositionSet
+                        enabled: _missionController.flyThroughCommandsAllowed
                         visible: toolStrip._isMissionLayer
                         checkable: true
                         onTriggered: { _addWaypointOnClick = !_addWaypointOnClick; if (_addWaypointOnClick) _addROIOnClick = false }
                     },
                     ToolStripAction {
                         id: roiButton
-                        text: qsTr("ROI")
+                        objectName: "planToolStrip_roiButton"
+                        text: _missionController.isROIActive ? qsTr("Cancel ROI") : qsTr("ROI")
                         iconSource: "/qmlimages/roi.svg"
-                        enabled: _homePositionSet
+                        enabled: _missionController.isInsertROIValid
                         visible: toolStrip._isMissionLayer && _planMasterController.controllerVehicle.supports.roiMode
                         checkable: true
                         onTriggered: { _addROIOnClick = !_addROIOnClick; if (_addROIOnClick) _addWaypointOnClick = false }
                     },
                     ToolStripAction {
+                        objectName: "planToolStrip_landButton"
                         text: _planMasterController.controllerVehicle.multiRotor
                                     ? qsTr("Return")
                                     : _missionController.isInsertLandValid && _missionController.hasLandItem
                                       ? qsTr("Alt Land")
                                       : qsTr("Land")
                         iconSource: "/res/rtl.svg"
-                        enabled: _homePositionSet && _missionController.isInsertLandValid
+                        enabled: _missionController.isInsertLandValid
                         visible: toolStrip._isMissionLayer
                         onTriggered: {
                             insertLandItemAfterCurrent()
@@ -754,14 +760,14 @@ Item {
             QGCLabel { text: qsTr("Create complex pattern:") }
 
             Repeater {
-                model: _missionController.complexMissionItemNames
+                model: _missionController.complexMissionItems
 
                 QGCButton {
-                    text: modelData
+                    text: modelData.translatedName
                     Layout.fillWidth: true
 
                     onClicked: {
-                        insertComplexItemAfterCurrent(modelData)
+                        insertComplexItemAfterCurrent(modelData.canonicalName)
                         dropPanel.hide()
                     }
                 }

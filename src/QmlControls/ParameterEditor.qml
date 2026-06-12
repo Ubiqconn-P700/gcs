@@ -26,6 +26,14 @@ Item {
         id: controller
     }
 
+    Connections {
+        target: controller
+        function onMissingParamsFromFile(missingParams) {
+            QGroundControl.showMessageDialog(_root, qsTr("Missing Parameters"),
+                qsTr("The following parameters from the file were not found on the vehicle and were skipped: %1").arg(missingParams.join("\n")))
+        }
+    }
+
     Timer {
         id:         clearTimer
         interval:   100;
@@ -98,7 +106,7 @@ Item {
     QGCFileDialog {
         id:             fileDialog
         folder:         _appSettings.parameterSavePath
-        nameFilters:    [ qsTr("Parameter Files (*.%1)").arg(_appSettings.parameterFileExtension) , qsTr("All Files (*)") ]
+        nameFilters:    [ qsTr("Parameter Files (*.%1)").arg(_appSettings.parameterFileExtension), qsTr("Mission Planner Files (*.param)"), qsTr("All Files (*)") ]
 
         onAcceptedForSave: (file) => {
             controller.saveToFile(file)
@@ -165,6 +173,12 @@ Item {
                     }
                     clearTimer.start()
                 }
+            }
+
+            QGCCheckBox {
+                text:       qsTr("Hide read-only")
+                checked:    controller.hideReadOnly
+                onClicked:  controller.hideReadOnly = checked
             }
         }
 
@@ -344,6 +358,7 @@ Item {
 
         delegate: Rectangle {
             implicitWidth:  column === 0 ? ScreenTools.implicitCheckBoxHeight + ScreenTools.defaultFontPixelWidth
+                                         : column === 1 ? nameRow.implicitWidth + ScreenTools.defaultFontPixelWidth
                                          : column === 2 ? ScreenTools.defaultFontPixelWidth * 16
                                                         : label.contentWidth + ScreenTools.defaultFontPixelWidth
             implicitHeight: label.contentHeight + ScreenTools.defaultFontPixelHeight * 0.5
@@ -383,13 +398,38 @@ Item {
                 onClicked:              controller.toggleFavorite(fact.name)
             }
 
+            Row {
+                id:                     nameRow
+                visible:                column === 1
+                anchors.left:           parent.left
+                anchors.leftMargin:     ScreenTools.defaultFontPixelWidth / 2
+                anchors.verticalCenter: parent.verticalCenter
+                spacing:               lockIcon.visible ? ScreenTools.defaultFontPixelWidth / 3 : 0
+
+                QGCLabel {
+                    text:               column === 1 ? display : ""
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                QGCColoredImage {
+                    id:                 lockIcon
+                    visible:            fact.readOnly
+                    source:             "qrc:/InstrumentValueIcons/lock-closed.svg"
+                    color:              qgcPal.text
+                    width:              ScreenTools.defaultFontPixelHeight * 0.8
+                    height:             width
+                    sourceSize.width:   width
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
             QGCLabel {
                 id:                 label
-                visible:            column !== 0
+                visible:            column !== 0 && column !== 1
                 anchors.left:       parent.left
                 anchors.leftMargin: ScreenTools.defaultFontPixelWidth / 2
                 anchors.verticalCenter: parent.verticalCenter
-                width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15 : contentWidth
+                width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15 : implicitWidth
                 text:               column == 2 ? col1String() : display
                 color:              column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault ? qgcPal.modifiedParamValue : qgcPal.text
                 font.bold:          column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault

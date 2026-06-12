@@ -1,6 +1,6 @@
 #include "MultiVehicleManager.h"
 #include "MAVLinkProtocol.h"
-#include "QGC.h"
+#include "AppMessages.h"
 #include "ParameterManager.h"
 #include "SettingsManager.h"
 #include "MavlinkSettings.h"
@@ -294,9 +294,7 @@ void MultiVehicleManager::_sendGCSHeartbeat()
             MAV_STATE_ACTIVE
         );
 
-        uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
-        const uint16_t len = mavlink_msg_to_send_buffer(buffer, &message);
-        (void) link->writeBytesThreadSafe(reinterpret_cast<const char*>(buffer), len);
+        link->sendMessageThreadSafe(message);
     }
 }
 

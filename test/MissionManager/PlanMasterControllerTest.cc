@@ -1,6 +1,7 @@
 #include "PlanMasterControllerTest.h"
 
 #include "AppSettings.h"
+#include "SurveyPlanCreator.h"
 #include "MissionManager.h"
 #include "MultiSignalSpy.h"
 #include "MultiVehicleManager.h"
@@ -11,6 +12,7 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QTemporaryDir>
 #include <QtTest/QSignalSpy>
 
@@ -39,6 +41,10 @@ void PlanMasterControllerTest::_testMissionPlannerFileLoad()
 
 void PlanMasterControllerTest::_testActiveVehicleChanged()
 {
+    // The test emits missionManager->error() twice to verify signal propagation.
+    // Each emission triggers a showAppMessage debug log via PlanMasterController.
+    ignoreLogMessage("API.QGCApplication.AppMessage", QtDebugMsg,
+                     QRegularExpression("Mission transfer failed"));
     // There was a defect where the PlanMasterController would, upon a new active vehicle,
     // overzelously disconnect all subscribers interested in the outgoing active vechicle.
     Vehicle* outgoingManagerVehicle = _masterController->managerVehicle();
@@ -270,10 +276,6 @@ void PlanMasterControllerTest::_testDirtyFlagsMatrix()
     }
 }
 
-// ===========================================================================
-// File name property tests
-// ===========================================================================
-
 void PlanMasterControllerTest::_testFileNamesSetOnLoad()
 {
     QSignalSpy currentNameSpy(_masterController, &PlanMasterController::currentPlanFileNameChanged);
@@ -340,9 +342,9 @@ void PlanMasterControllerTest::_testSaveWithCurrentName()
     _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
 
     // First save to a real (writable) directory so _currentPlanFile points somewhere valid
-    QTemporaryDir tmpDir;
-    QVERIFY(tmpDir.isValid());
-    const QString initialPath = QStringLiteral("%1/MissionPlanner.%2").arg(tmpDir.path(), _masterController->fileExtension());
+    QTemporaryDir* const tmpDir = createTempDir();
+    QVERIFY(tmpDir && tmpDir->isValid());
+    const QString initialPath = QStringLiteral("%1/MissionPlanner.%2").arg(tmpDir->path(), _masterController->fileExtension());
     QVERIFY(_masterController->saveToFile(initialPath));
 
     // Rename
@@ -383,9 +385,9 @@ void PlanMasterControllerTest::_testResolvedPlanFileExists()
     QVERIFY(!_masterController->resolvedPlanFileExists());
 
     // Save a file so it exists on disk
-    QTemporaryDir tmpDir;
-    QVERIFY(tmpDir.isValid());
-    const QString savePath = QStringLiteral("%1/ExistingPlan.%2").arg(tmpDir.path(), _masterController->fileExtension());
+    QTemporaryDir* const tmpDir = createTempDir();
+    QVERIFY(tmpDir && tmpDir->isValid());
+    const QString savePath = QStringLiteral("%1/ExistingPlan.%2").arg(tmpDir->path(), _masterController->fileExtension());
     QVERIFY(_masterController->saveToFile(savePath));
 
     // Now rename to the same base name — file exists at resolved path
@@ -460,6 +462,148 @@ void PlanMasterControllerTest::_testSaveUpdatesOriginalFileName()
 
     // Clean up
     QFile::remove(saveFile);
+}
+
+void PlanMasterControllerTest::_testTemplateModeHidesTemplatesOnPlanCreatorSelection()
+{
+    // Initial state: empty plan → templates shown
+    QVERIFY(_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+
+    // User selects a plan creator (e.g. Survey) — adds items to the plan
+    SurveyPlanCreator creator(_masterController);
+    creator.createPlan(QGeoCoordinate(47.0, -122.0));
+
+    QVERIFY(_masterController->containsItems());
+    QVERIFY(!_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+}
+
+void PlanMasterControllerTest::_testTemplateModeHidesTemplatesOnFileLoad()
+{
+    // Initial state: empty plan, not manual creation → templates shown
+    QVERIFY(_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+
+    _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
+
+    QVERIFY(_masterController->containsItems());
+    QVERIFY(!_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+}
+
+void PlanMasterControllerTest::_testTemplateModeRestoredOnRemoveAll()
+{
+    _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
+    QVERIFY(!_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+
+    _masterController->removeAll();
+
+    QVERIFY(!_masterController->containsItems());
+    QVERIFY(_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+}
+
+void PlanMasterControllerTest::_testTemplateModeRestoredOnIndividualItemRemoval()
+{
+    _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
+    QVERIFY(!_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+
+    _masterController->missionController()->removeAll();
+    _masterController->geoFenceController()->removeAll();
+    _masterController->rallyPointController()->removeAll();
+
+    QVERIFY(!_masterController->containsItems());
+    QVERIFY(_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+}
+
+void PlanMasterControllerTest::_testManualCreationHidesTemplates()
+{
+    // Initial state: empty plan → templates shown
+    QVERIFY(_masterController->showCreateFromTemplate());
+    QVERIFY(!_masterController->userSelectedManualCreation());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+    QSignalSpy spyManual(_masterController, &PlanMasterController::userSelectedManualCreationChanged);
+
+    // User clicks "No Template" — hides templates even though plan is empty
+    _masterController->setUserSelectedManualCreation(true);
+
+    QVERIFY(_masterController->userSelectedManualCreation());
+    QVERIFY(!_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+    QCOMPARE(spyManual.count(), 1);
+
+    // Setting the same value again should not re-emit
+    _masterController->setUserSelectedManualCreation(true);
+    QCOMPARE(spyShow.count(), 1);
+    QCOMPARE(spyManual.count(), 1);
+}
+
+void PlanMasterControllerTest::_testManualCreationRestoredOnRemoveAll()
+{
+    _masterController->setUserSelectedManualCreation(true);
+    _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
+    QVERIFY(!_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+    QSignalSpy spyManual(_masterController, &PlanMasterController::userSelectedManualCreationChanged);
+
+    _masterController->removeAll();
+
+    QVERIFY(!_masterController->containsItems());
+    QVERIFY(!_masterController->userSelectedManualCreation());
+    QVERIFY(_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+    QCOMPARE(spyManual.count(), 1);
+}
+
+void PlanMasterControllerTest::_testManualCreationRestoredOnIndividualItemRemoval()
+{
+    _masterController->setUserSelectedManualCreation(true);
+    _masterController->loadFromFile(":/unittest/MissionPlanner.waypoints");
+    QVERIFY(!_masterController->showCreateFromTemplate());
+
+    QSignalSpy spyShow(_masterController, &PlanMasterController::showCreateFromTemplateChanged);
+    QSignalSpy spyManual(_masterController, &PlanMasterController::userSelectedManualCreationChanged);
+
+    _masterController->missionController()->removeAll();
+    _masterController->geoFenceController()->removeAll();
+    _masterController->rallyPointController()->removeAll();
+
+    QVERIFY(!_masterController->containsItems());
+    QVERIFY(!_masterController->userSelectedManualCreation());
+    QVERIFY(_masterController->showCreateFromTemplate());
+    QCOMPARE(spyShow.count(), 1);
+    QCOMPARE(spyManual.count(), 1);
+}
+
+void PlanMasterControllerTest::_testPlanCreatorsFiltered()
+{
+    // MultiRotor supports StructureScan — expect all 4 creators
+    PlanMasterController multiRotorController(MAV_AUTOPILOT_PX4, MAV_TYPE_QUADROTOR);
+    multiRotorController.setFlyView(false);
+    multiRotorController.start();
+    QVERIFY(multiRotorController.planCreators() != nullptr);
+    const int multiRotorCount = multiRotorController.planCreators()->count();
+    QVERIFY(multiRotorCount > 0);
+
+    // FixedWing does not support StructureScan — expect one fewer creator
+    PlanMasterController fixedWingController(MAV_AUTOPILOT_PX4, MAV_TYPE_FIXED_WING);
+    fixedWingController.setFlyView(false);
+    fixedWingController.start();
+    QVERIFY(fixedWingController.planCreators() != nullptr);
+    const int fixedWingCount = fixedWingController.planCreators()->count();
+    QVERIFY(fixedWingCount > 0);
+
+    QCOMPARE(fixedWingCount, multiRotorCount - 1);
 }
 
 #include "UnitTest.h"

@@ -11,7 +11,7 @@ void AsyncFunctionStateTest::_testAsyncFunctionState()
     AsyncFunctionState* capturedState = nullptr;
 
     // Expected: async state has no completion connection and no timeout
-    expectLogMessage(QtCriticalMsg, QRegularExpression("has no completion connection"));
+    expectLogMessage("Utilities.QGCStateMachine", QtCriticalMsg, QRegularExpression("has no completion connection"));
 
     auto* asyncState = new AsyncFunctionState(
         QStringLiteral("TestAsync"),
@@ -24,15 +24,8 @@ void AsyncFunctionStateTest::_testAsyncFunctionState()
             });
         }
     );
-    auto* finalState = new QFinalState(&machine);
-
-    asyncState->addTransition(asyncState, &QGCState::advance, finalState);
-    machine.setInitialState(asyncState);
-
-    QSignalSpy finishedSpy(&machine, &QStateMachine::finished);
-    machine.start();
-
-    QVERIFY(finishedSpy.wait(TestTimeout::shortMs()));
+    QVERIFY(runStateToCompletion(asyncState, &machine));
+    verifyExpectedLogMessage();
     QVERIFY(setupCalled);
     QVERIFY(capturedState != nullptr);
 }
@@ -82,7 +75,7 @@ void AsyncFunctionStateTest::_testErrorTransition()
     bool errorHandled = false;
 
     // Expected: async state has no completion connection and no timeout
-    expectLogMessage(QtCriticalMsg, QRegularExpression("has no completion connection"));
+    expectLogMessage("Utilities.QGCStateMachine", QtCriticalMsg, QRegularExpression("has no completion connection"));
 
     auto* asyncState = new AsyncFunctionState(
         QStringLiteral("TestError"),
@@ -111,6 +104,7 @@ void AsyncFunctionStateTest::_testErrorTransition()
     machine.start();
 
     QVERIFY(finishedSpy.wait(TestTimeout::shortMs()));
+    verifyExpectedLogMessage();
     QVERIFY(errorHandled);
     // Verify error path taken, not success path
     QVERIFY(stateSpy.emittedByMask(stateSpy.mask("error")));

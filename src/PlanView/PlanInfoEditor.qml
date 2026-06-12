@@ -17,8 +17,8 @@ Rectangle {
     property var _visualItems: missionController.visualItems
     property bool _noMissionItemsAdded: _visualItems ? _visualItems.count <= 1 : true
     property var _settingsItem: _visualItems && _visualItems.count > 0 ? _visualItems.get(0) : null
-    property bool _multipleFirmware: !QGroundControl.singleFirmwareSupport && QGroundControl.settingsManager.appSettings.preferredFirmwareClass.rawValue === 0
-    property bool _multipleVehicleTypes: !QGroundControl.singleVehicleSupport && QGroundControl.settingsManager.appSettings.preferredVehicleClass.rawValue === 0
+    property bool _multipleFirmware: !QGroundControl.singleFirmwareSupport
+    property bool _multipleVehicleTypes: !QGroundControl.singleVehicleSupport
     property bool _allowFWVehicleTypeSelection: _noMissionItemsAdded && !globals.activeVehicle
     property bool _waypointsOnlyMode: QGroundControl.corePlugin.options.missionWaypointsOnly
     property real _fieldWidth: ScreenTools.defaultFontPixelWidth * 16
@@ -79,24 +79,28 @@ Rectangle {
             visible: vehicleInfoSectionHeader.visible && vehicleInfoSectionHeader.checked
 
             FactComboBox {
+                objectName: "planInfo_firmwareCombo"
                 fact: QGroundControl.settingsManager.appSettings.offlineEditingFirmwareClass
                 indexModel: false
                 Layout.fillWidth: true
                 visible: _root._multipleFirmware && _root._allowFWVehicleTypeSelection
             }
             QGCLabel {
+                objectName: "planInfo_firmwareLabel"
                 text: _root._controllerVehicle ? _root._controllerVehicle.firmwareTypeString : ""
                 Layout.fillWidth: true
                 visible: _root._multipleFirmware && !_root._allowFWVehicleTypeSelection
             }
 
             FactComboBox {
+                objectName: "planInfo_vehicleTypeCombo"
                 fact: QGroundControl.settingsManager.appSettings.offlineEditingVehicleClass
                 indexModel: false
                 Layout.fillWidth: true
                 visible: _root._multipleVehicleTypes && _root._allowFWVehicleTypeSelection
             }
             QGCLabel {
+                objectName: "planInfo_vehicleTypeLabel"
                 text: _root._controllerVehicle ? _root._controllerVehicle.vehicleTypeString : ""
                 Layout.fillWidth: true
                 visible: _root._multipleVehicleTypes && !_root._allowFWVehicleTypeSelection
@@ -115,7 +119,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: ScreenTools.defaultFontPixelWidth / 2
             spacing: ScreenTools.defaultFontPixelWidth / 2
-            visible: plannedHomePositionSection.checked && _root.planMasterController.readyForPlanCreation
+            visible: plannedHomePositionSection.checked && _root.planMasterController.showCreateFromTemplate
 
             Image {
                 source: "qrc:///qmlimages/MapHome.svg"
@@ -151,15 +155,18 @@ Rectangle {
 
             QGCLabel {
                 text: qsTr("Altitude (AMSL)")
+                font.pointSize: ScreenTools.smallFontPointSize
             }
             FactTextField {
                 fact: _root._settingsItem ? _root._settingsItem.plannedHomePositionAltitude : null
                 Layout.fillWidth: true
+                font.pointSize: ScreenTools.smallFontPointSize
                 visible: _root._settingsItem && _root._settingsItem.terrainQueryFailed
             }
             QGCLabel {
                 text: _root._settingsItem ? _root._settingsItem.plannedHomePositionAltitude.valueString + " " + _root._settingsItem.plannedHomePositionAltitude.units : ""
                 Layout.fillWidth: true
+                font.pointSize: ScreenTools.smallFontPointSize
                 visible: !_root._settingsItem || !_root._settingsItem.terrainQueryFailed
             }
         }
@@ -171,6 +178,41 @@ Rectangle {
             text: qsTr("Actual position/alt set by vehicle at flight time.")
             horizontalAlignment: Text.AlignHCenter
             visible: plannedHomePositionSection.checked && _root.missionController.homePositionSet
+        }
+
+        // ── Plan Templates ──
+        SectionHeader {
+            id: planTemplateSectionHeader
+            objectName: "planInfo_templatesSection"
+            Layout.fillWidth: true
+            text: qsTr("Plan Templates")
+            visible: _root.planMasterController.showCreateFromTemplate
+        }
+
+        ColumnLayout {
+            objectName: "planInfo_templatesColumn"
+            Layout.fillWidth: true
+            spacing: ScreenTools.defaultFontPixelHeight / 2
+            visible: planTemplateSectionHeader.visible && planTemplateSectionHeader.checked
+            enabled: _root.missionController.homePositionSet
+            opacity: enabled ? 1.0 : 0.5
+
+            Repeater {
+                model: _root.planMasterController.planCreators
+
+                QGCButton {
+                    objectName: "planCreator_" + object.name
+                    Layout.fillWidth: true
+                    text: object.name
+                    onClicked: {
+                        if (object.blankPlan) {
+                            _root.planMasterController.userSelectedManualCreation = true
+                        } else {
+                            object.createPlan(_root.editorMap.center)
+                        }
+                    }
+                }
+            }
         }
     }
 }

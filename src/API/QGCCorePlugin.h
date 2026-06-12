@@ -6,8 +6,10 @@
 
 #include "QGCPalette.h"
 
+class ComplexMissionItem;
 class FactMetaData;
 class LinkInterface;
+class PlanCreator;
 class PlanMasterController;
 class QFile;
 class QGCOptions;
@@ -21,6 +23,16 @@ class VideoSink;
 class FactValueGrid;
 typedef struct __mavlink_message mavlink_message_t;
 
+/// \brief Extension mechanism for generic, non-firmware-specific customization of QGC.
+///
+/// QGCCorePlugin is the extension point for custom builds that need to modify QGC
+/// as a whole, rather than for behavior that varies by firmware type (which belongs
+/// in FirmwarePlugin). Override its virtual methods to add or replace UI pages,
+/// Flight Map items, toolbar indicators, video pipeline components, plan file
+/// hooks, and other application-level behavior. The base class provides the
+/// standard QGC implementation; custom builds subclass it and register the
+/// subclass before \c QGCApplication starts up.
+///
 class QGCCorePlugin : public QObject
 {
     Q_OBJECT
@@ -133,10 +145,38 @@ public:
     /// Custom builds must override to provide their own location.
     virtual QString stableDownloadLocation() const { return QStringLiteral("qgroundcontrol.com"); }
 
-    /// Returns the complex mission items to display in the Plan UI
-    /// @param complexMissionItemNames Default set of complex items
+    /// Returns the complex mission items to display in the Plan UI.
+    /// Each entry in the list is a QVariantMap with keys:
+    ///   "canonicalName"  - untranslated key used with insertComplexMissionItem()
+    ///   "translatedName" - user-visible display string (already translated)
+    /// The base class builds and returns the default set. Custom builds should
+    /// override this method, call the base class to get the defaults, modify as
+    /// needed, and return the result. When adding a new entry, set both keys and
+    /// override createComplexMissionItem() to handle the new canonicalName.
+    /// @param vehicle Vehicle for which the list is being built
     /// @return Complex items to be made available to user
-    virtual QStringList complexMissionItemNames(Vehicle *vehicle, const QStringList &complexMissionItemNames) { Q_UNUSED(vehicle); return complexMissionItemNames; }
+    virtual QVariantList complexMissionItemNames(Vehicle *vehicle);
+
+    /// Factory for creating custom complex mission items.
+    /// Called by MissionController when the canonicalName/complexItemType is not one of the
+    /// built-in types (Survey, CorridorScan, StructureScan, FixedWingLanding, VTOLLanding).
+    /// For JSON load, the returned item has load() called on it immediately afterward.
+    ///     @param complexItemType  The canonicalName / jsonComplexItemTypeValue identifying the item
+    ///     @param masterController PlanMasterController for the item
+    ///     @param flyView          true if creating for fly view (read-only)
+    ///     @param kmlOrShpFile     Optional KML/SHP file to initialize from; QString() if none
+    /// @return New item (caller takes ownership), or nullptr if the type is not handled
+    virtual ComplexMissionItem *createComplexMissionItem(
+        const QString &complexItemType,
+        PlanMasterController *masterController,
+        bool flyView,
+        const QString &kmlOrShpFile = QString());
+
+    /// Returns the list of plan creators to show when creating a new plan.
+    /// Custom builds can override to provide their own set of plan creators.
+    /// @param planMasterController The plan master controller for the plan being created
+    /// @return Plan creators to show. Caller takes ownership.
+    virtual QList<PlanCreator*> planCreators(PlanMasterController *planMasterController);
 
     /// Returns the standard list of first run prompt ids for possible display. Actual display is based on the
     /// current AppSettings::firstRunPromptIds value. The order of this list also determines the order the prompts

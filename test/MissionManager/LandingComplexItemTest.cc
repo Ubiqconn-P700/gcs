@@ -1,13 +1,13 @@
+#include "JsonParsing.h"
 #include "QmlObjectListModel.h"
 #include "LandingComplexItemTest.h"
 
 #include "CameraSection.h"
 #include "CameraSectionTest.h"
 #include "Fixtures/TestFixtures.h"
-#include "JsonHelper.h"
 #include "MultiSignalSpy.h"
 #include "PlanMasterController.h"
-#include "QGC.h"
+#include "QGCMath.h"
 #include "SimpleMissionItem.h"
 
 using namespace TestFixtures;
@@ -71,7 +71,7 @@ void LandingComplexItemTest::_testDirty()
             << _item->landingDistance() << _item->useLoiterToAlt() << _item->stopTakingPhotos()
             << _item->stopTakingVideo();
     for (Fact* fact : rgFacts) {
-        qDebug() << fact->name();
+        qCDebug(UnitTestLog) << fact->name();
         QVERIFY(!_item->dirty());
         changeFactValue(fact);
         QVERIFY(_viMultiSpy->emittedOnce("dirtyChanged"));
@@ -84,7 +84,7 @@ void LandingComplexItemTest::_testDirty()
     rgBoolNames << "altitudesAreRelative";
     const QMetaObject* metaObject = _item->metaObject();
     for (const char* boolName : rgBoolNames) {
-        qDebug() << boolName;
+        qCDebug(UnitTestLog) << boolName;
         QVERIFY(!_item->dirty());
         QMetaProperty boolProp = metaObject->property(metaObject->indexOfProperty(boolName));
         QVERIFY(boolProp.write(_item, !boolProp.read(_item).toBool()));
@@ -151,7 +151,7 @@ void LandingComplexItemTest::_testAppendSectionItems()
 
     for (size_t i = 0; i < std::size(rgTestCases); i++) {
         TestCase_s& testCase = rgTestCases[i];
-        qDebug() << "stopTakingPhotos" << testCase.stopTakingPhotos << "stopTakingVideo" << testCase.stopTakingVideo
+        qCDebug(UnitTestLog) << "stopTakingPhotos" << testCase.stopTakingPhotos << "stopTakingVideo" << testCase.stopTakingVideo
                  << "useLoiterToAlt" << testCase.useLoiterToAlt;
         _item->stopTakingPhotos()->setRawValue(testCase.stopTakingPhotos);
         _item->stopTakingVideo()->setRawValue(testCase.stopTakingVideo);
@@ -180,7 +180,7 @@ void LandingComplexItemTest::_testAppendSectionItems()
                                  (testCase.stopTakingVideo ? CameraSection::stopTakingVideoCommandCount() : 0);
         QCOMPARE(rgMissionItems[finalApproachIndex]->command(),
                  testCase.useLoiterToAlt ? MAV_CMD_NAV_LOITER_TO_ALT : MAV_CMD_NAV_WAYPOINT);
-        qDebug() << rgMissionItems[finalApproachIndex + 1]->command();
+        qCDebug(UnitTestLog) << rgMissionItems[finalApproachIndex + 1]->command();
         QCOMPARE(rgMissionItems[finalApproachIndex + 1]->command(), MAV_CMD_NAV_LAND);
         simpleItems->deleteLater();
         rgMissionItems.clear();
@@ -203,7 +203,7 @@ void LandingComplexItemTest::_testScanForItems()
 
     for (size_t i = 0; i < std::size(rgTestCases); i++) {
         TestCase_s& testCase = rgTestCases[i];
-        qDebug() << "stopTakingPhotos" << testCase.stopTakingPhotos << "stopTakingVideo" << testCase.stopTakingVideo
+        qCDebug(UnitTestLog) << "stopTakingPhotos" << testCase.stopTakingPhotos << "stopTakingVideo" << testCase.stopTakingVideo
                  << "useLoiterToAlt" << testCase.useLoiterToAlt;
         _item->stopTakingPhotos()->setRawValue(testCase.stopTakingPhotos);
         _item->stopTakingVideo()->setRawValue(testCase.stopTakingVideo);
@@ -233,7 +233,7 @@ void LandingComplexItemTest::_testSaveLoad()
 {
     QString errorString;
     QJsonObject saveObject = _item->_save();
-    saveObject[JsonHelper::jsonVersionKey] = 1;
+    saveObject[JsonParsing::jsonVersionKey] = 1;
     saveObject[VisualMissionItem::jsonTypeKey] = VisualMissionItem::jsonTypeComplexItemValue;
     saveObject[ComplexMissionItem::jsonComplexItemTypeKey] = SimpleLandingComplexItem::jsonComplexItemTypeValue;
     // Test useDeprecatedRelAltKeys = false
@@ -242,7 +242,7 @@ void LandingComplexItemTest::_testSaveLoad()
         newItem->_load(saveObject, 0 /* sequenceNumber */, SimpleLandingComplexItem::jsonComplexItemTypeValue,
                        false /* useDeprecatedRelAltKeys */, errorString);
     if (!loadSuccess) {
-        qDebug() << "_load failed" << errorString;
+        qCDebug(UnitTestLog) << "_load failed" << errorString;
     }
     QVERIFY(loadSuccess);
     QVERIFY(errorString.isEmpty());
@@ -257,7 +257,7 @@ void LandingComplexItemTest::_testSaveLoad()
     loadSuccess = newItem->_load(saveObject, 0 /* sequenceNumber */, SimpleLandingComplexItem::jsonComplexItemTypeValue,
                                  true /* useDeprecatedRelAltKeys */, errorString);
     if (!loadSuccess) {
-        qDebug() << "_load failed" << errorString;
+        qCDebug(UnitTestLog) << "_load failed" << errorString;
     }
     QVERIFY(loadSuccess);
     QVERIFY(errorString.isEmpty());
@@ -265,7 +265,7 @@ void LandingComplexItemTest::_testSaveLoad()
     newItem->deleteLater();
     // Test for _jsonDeprecatedLoiterCoordinateKey support
     saveObject = _item->_save();
-    saveObject[JsonHelper::jsonVersionKey] = 1;
+    saveObject[JsonParsing::jsonVersionKey] = 1;
     saveObject[VisualMissionItem::jsonTypeKey] = VisualMissionItem::jsonTypeComplexItemValue;
     saveObject[ComplexMissionItem::jsonComplexItemTypeKey] = SimpleLandingComplexItem::jsonComplexItemTypeValue;
     saveObject[LandingComplexItem::_jsonDeprecatedLoiterCoordinateKey] =
@@ -275,7 +275,7 @@ void LandingComplexItemTest::_testSaveLoad()
     loadSuccess = newItem->_load(saveObject, 0 /* sequenceNumber */, SimpleLandingComplexItem::jsonComplexItemTypeValue,
                                  false /* useDeprecatedRelAltKeys */, errorString);
     if (!loadSuccess) {
-        qDebug() << "_load failed" << errorString;
+        qCDebug(UnitTestLog) << "_load failed" << errorString;
     }
     QVERIFY(loadSuccess);
     QVERIFY(errorString.isEmpty());

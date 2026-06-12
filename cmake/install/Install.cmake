@@ -128,7 +128,9 @@ elseif(LINUX)
         set(QGC_BUILD_DIR \"${CMAKE_BINARY_DIR}\")
         set(CMAKE_SYSTEM_PROCESSOR \"${CMAKE_SYSTEM_PROCESSOR}\")
     ")
-    install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/install/CreateAppImage.cmake")
+    if(QGC_CREATE_APPIMAGE)
+        install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/install/CreateAppImage.cmake")
+    endif()
 
 # ----------------------------------------------------------------------------
 # Windows Installation & Installer Creation
@@ -193,7 +195,7 @@ elseif(MACOS)
             NAME create-dmg
             GITHUB_REPOSITORY create-dmg/create-dmg
             GIT_TAG v1.2.3
-            DOWNLOAD_ONLY
+            DOWNLOAD_ONLY YES
         )
         set(CREATE_DMG_PROGRAM "${create-dmg_SOURCE_DIR}/create-dmg")
     endif()

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "TempDirectoryTest.h"
+#include "UnitTest.h"
 
-class GeoJsonHelperTest : public TempDirectoryTest
+class GeoJsonHelperTest : public UnitTest
 {
     Q_OBJECT
 
@@ -19,4 +19,6 @@ private slots:
     void _loadPolylineFromNestedGeometryCollection_test();
     void _loadPolygonFromPolylineFails_test();
     void _loadPolylineFromPolygonFails_test();
+    void _loadSaveGeoJsonCoordinate_test();
+    void _loadSaveGeoJsonCoordinateWithAltitude_test();
 };
