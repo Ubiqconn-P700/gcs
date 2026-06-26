@@ -51,15 +51,16 @@ installer {
     }
     AndroidBuild {
         _ANDROID_KEYSTORE_PASSWORD = $$(ANDROID_KEYSTORE_PASSWORD)
+        _ANDROID_KEY_ALIAS = $$(ANDROID_KEY_ALIAS)
         QMAKE_POST_LINK += && mkdir -p package
-        isEmpty(_ANDROID_KEYSTORE_PASSWORD) {
-            message(Keystore password not available - not signing package)
-            # This is for builds in forks and PR where the Android keystore password is not available
+        isEmpty(_ANDROID_KEYSTORE_PASSWORD) | isEmpty(_ANDROID_KEY_ALIAS) {
+            message(Keystore password or alias not available - not signing package)
+            # This is for builds in forks and PR where the Android keystore password or alias is not available
             QMAKE_POST_LINK += && make apk
             QMAKE_POST_LINK += && cp android-build/build/outputs/apk/debug/android-build-debug.apk package/QGC_v$${VERSION}.apk
         } else {
             QMAKE_POST_LINK += && make apk_install_target INSTALL_ROOT=android-build
-            QMAKE_POST_LINK += && androiddeployqt --verbose --input android-QGroundControl-deployment-settings.json --output android-build --release --sign $${SOURCE_DIR}/android/android_release.jks ubiqconn_sha256 --storepass $$(ANDROID_KEYSTORE_PASSWORD)
+            QMAKE_POST_LINK += && androiddeployqt --verbose --input android-QGroundControl-deployment-settings.json --output android-build --release --sign $${SOURCE_DIR}/android/android_release.jks $${_ANDROID_KEY_ALIAS} --storepass $$(ANDROID_KEYSTORE_PASSWORD)
             QMAKE_POST_LINK += && cp android-build/build/outputs/apk/release/android-build-release-signed.apk package/QGC_v$${VERSION}.apk
         }
     }
