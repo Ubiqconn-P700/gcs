@@ -31,7 +31,8 @@ Item {
 
     Column {
         id:                 mainCol
-        anchors.centerIn:   parent
+        x:                  ScreenTools.defaultFontPixelWidth
+        y:                  ScreenTools.defaultFontPixelHeight
         spacing:            ScreenTools.defaultFontPixelHeight
         GridLayout {
             columns:            2

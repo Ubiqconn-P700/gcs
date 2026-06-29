@@ -25,8 +25,9 @@ Item {
     width:                  calCol.width  + ScreenTools.defaultFontPixelWidth  * 2
     Column {
         id:                 calCol
+        x:                  ScreenTools.defaultFontPixelWidth
+        y:                  ScreenTools.defaultFontPixelHeight
         spacing:            ScreenTools.defaultFontPixelHeight
-        anchors.centerIn:   parent
         Item {
             height:         1
             width:          1

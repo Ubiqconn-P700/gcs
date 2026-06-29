@@ -45,7 +45,7 @@ SetupPage {
         id: pageComponent
         Item {
             width:  availableWidth
-            height: bar.height + joyLoader.height
+            height: bar.height + contentFlickable.height
 
             readonly property real  labelToMonitorMargin:   ScreenTools.defaultFontPixelWidth * 3
 
@@ -94,11 +94,20 @@ SetupPage {
 
             property var pages:  ["JoystickConfigGeneral.qml", "JoystickConfigButtons.qml", "JoystickConfigCalibration.qml", "JoystickConfigAdvanced.qml"]
 
-            Loader {
-                id:             joyLoader
-                source:         pages[bar.currentIndex]
-                width:          parent.width
-                anchors.top:    bar.bottom
+            QGCFlickable {
+                id:                 contentFlickable
+                width:              parent.width
+                height:             joyLoader.item ? joyLoader.item.height : 0
+                anchors.top:        bar.bottom
+                clip:               true
+                contentWidth:       Math.max(width, joyLoader.item ? joyLoader.item.width : 0)
+                contentHeight:      height
+                flickableDirection: Flickable.HorizontalFlick
+
+                Loader {
+                    id:             joyLoader
+                    source:         pages[bar.currentIndex]
+                }
             }
         }
     }

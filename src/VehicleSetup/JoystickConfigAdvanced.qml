@@ -26,10 +26,11 @@ Item {
     //---------------------------------------------------------------------
     GridLayout {
         id:                 grid
+        x:                  ScreenTools.defaultFontPixelWidth
+        y:                  ScreenTools.defaultFontPixelHeight
         columns:            2
         columnSpacing:      ScreenTools.defaultFontPixelWidth
         rowSpacing:         ScreenTools.defaultFontPixelHeight
-        anchors.centerIn:   parent
         //-------------------------------------------------------------
         //-------------------------------------------------------------
         QGCRadioButton {
