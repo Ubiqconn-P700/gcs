@@ -17,6 +17,9 @@ on:
       - "docs/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 defaults:
   run:
     shell: bash
